@@ -2,7 +2,8 @@
 
 /**
  * What a referral's fields say through FHIR (#14710's Data items): its Risk Level as the
- * ServiceRequest's and the Task's priority, and its Referral Category as categories.
+ * ServiceRequest's and the Task's priority, its Referral Category as categories, and its
+ * coded Referrer Diagnosis linked to the patient's problem list.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -43,6 +44,9 @@ class ReferralDataFhirApiTest extends TestCase
     /** @var list<int> transaction ids */
     private array $transactions = [];
 
+    /** @var list<int> lists ids */
+    private array $problems = [];
+
     protected function setUp(): void
     {
         $baseUrl = getenv("OPENEMR_BASE_URL_API", true) ?: "https://localhost";
@@ -71,6 +75,10 @@ class ReferralDataFhirApiTest extends TestCase
             }
             QueryUtils::sqlStatementThrowException('DELETE FROM lbt_data WHERE form_id = ?', [$id]);
             QueryUtils::sqlStatementThrowException('DELETE FROM transactions WHERE id = ?', [$id]);
+        }
+        foreach ($this->problems as $problem) {
+            QueryUtils::sqlStatementThrowException("DELETE FROM uuid_registry WHERE table_name = 'lists' AND uuid IN (SELECT uuid FROM lists WHERE id = ?)", [$problem]);
+            QueryUtils::sqlStatementThrowException('DELETE FROM lists WHERE id = ?', [$problem]);
         }
         foreach ($this->people as $person) {
             QueryUtils::sqlStatementThrowException('DELETE FROM users WHERE id = ?', [$person['id']]);
@@ -129,12 +137,12 @@ class ReferralDataFhirApiTest extends TestCase
         QueryUtils::sqlStatementThrowException("UPDATE list_options SET codes = 'SNOMED-CT:306136006' WHERE list_id = 'referral_category' AND option_id = 'behavioral_health'");
         $behavioral = $this->saveReferral(['refer_to' => $this->people['pantry']['id'], 'refer_category' => 'behavioral_health', 'body' => 'x']);
 
-        $this->assertSame(['text' => 'Specialty Care'], $this->read('ServiceRequest', $this->referralUuid($specialty))['category'][1] ?? null);
-        $category = $this->read('ServiceRequest', $this->referralUuid($behavioral))['category'][1] ?? null;
+        $this->assertSame(['text' => 'Specialty Care'], self::at($this->read('ServiceRequest', $this->referralUuid($specialty)), 'category', 1));
+        $category = self::at($this->read('ServiceRequest', $this->referralUuid($behavioral)), 'category', 1);
         $this->assertIsArray($category);
         $this->assertSame('Behavioral Health', $category['text'] ?? null);
-        $this->assertSame('http://snomed.info/sct', $category['coding'][0]['system'] ?? null);
-        $this->assertSame('306136006', $category['coding'][0]['code'] ?? null);
+        $this->assertSame('http://snomed.info/sct', self::at($category, 'coding', 0, 'system'));
+        $this->assertSame('306136006', self::at($category, 'coding', 0, 'code'));
     }
 
     public function testACategorySearchFindsReferralsByTheirCategory(): void
@@ -149,6 +157,67 @@ class ReferralDataFhirApiTest extends TestCase
         $this->assertSame([], $this->ids($patient + ['category' => 'http://snomed.info/sct|food-insecurity']), 'the right code in another system');
         $this->assertEqualsCanonicalizing([$food, $specialty, $none], $this->ids($patient + ['category' => '3457005']));
         $this->assertSame([], $this->ids($patient + ['category' => 'http://snomed.info/sct|108252007']), 'a laboratory category reads only orders');
+    }
+
+    public function testACodedDiagnosisLinksThePatientsMatchingActiveProblem(): void
+    {
+        $this->assertEquals(15, QueryUtils::fetchSingleValue("SELECT data_type FROM layout_options WHERE form_id = 'LBTref' AND field_id = 'refer_diag'", 'data_type', []), 'Referrer Diagnosis takes codes');
+        $hypertension = $this->insertProblem($this->patient['pid'], 'Hypertension', 'ICD10:I10', 1);
+        $this->insertProblem($this->patient['pid'], 'Hypertension, resolved', 'ICD10:I10', 0);
+        $this->insertProblem($this->patient['pid'], 'Diabetes', 'ICD10:E11.9', 1);
+        $other = $this->fixtures->createTestPatient();
+        $this->assertIsInt($other['pid'] ?? null);
+        $this->insertProblem($other['pid'], 'Someone else', 'ICD10:I10', 1);
+        $coded = $this->saveReferral(['refer_to' => $this->people['pantry']['id'], 'refer_diag' => 'ICD10:I10; Chest pain', 'body' => 'x']);
+        $words = $this->saveReferral(['refer_to' => $this->people['pantry']['id'], 'refer_diag' => 'Hypertension', 'body' => 'x']);
+
+        $references = $this->read('ServiceRequest', $this->referralUuid($coded))['reasonReference'] ?? null;
+        $this->assertIsArray($references);
+        $this->assertCount(1, $references, 'the active problem with the code, not the resolved one, another code, or another patient\'s');
+        $uuid = QueryUtils::fetchSingleValue('SELECT uuid FROM lists WHERE id = ?', 'uuid', [$hypertension]);
+        $this->assertIsString($uuid);
+        $this->assertSame(['reference' => 'Condition/' . UuidRegistry::uuidToString($uuid), 'type' => 'Condition', 'display' => 'Hypertension'], $references[0]);
+        $this->assertSame('Condition', $this->read('Condition', UuidRegistry::uuidToString($uuid))['resourceType'] ?? null, 'the Condition reads');
+        $this->assertArrayNotHasKey('reasonReference', $this->read('ServiceRequest', $this->referralUuid($words)), 'words link nothing');
+    }
+
+    public function testASnomedRequestedServiceIsCodedAsSnomed(): void
+    {
+        // Requested Service's picker offers every active code type, SNOMED CT among them once a
+        // site has activated it, and stores the pick as TYPE:code.
+        $id = $this->saveReferral(['refer_to' => $this->people['pantry']['id'], 'refer_related_code' => 'SNOMED-CT:306206005', 'body' => 'x']);
+
+        $coding = self::at($this->read('ServiceRequest', $this->referralUuid($id)), 'code', 'coding', 0);
+        $this->assertIsArray($coding);
+        $this->assertSame('http://snomed.info/sct', $coding['system'] ?? null);
+        $this->assertSame('306206005', $coding['code'] ?? null);
+    }
+
+    /**
+     * The value at a path of keys in a decoded resource, or null.
+     *
+     * @param array<mixed> $resource
+     */
+    private static function at(array $resource, string|int ...$path): mixed
+    {
+        $value = $resource;
+        foreach ($path as $key) {
+            if (!is_array($value) || !array_key_exists($key, $value)) {
+                return null;
+            }
+            $value = $value[$key];
+        }
+        return $value;
+    }
+
+    private function insertProblem(int $pid, string $title, string $diagnosis, int $activity): int
+    {
+        $id = (int)QueryUtils::sqlInsert(
+            "INSERT INTO lists (date, type, title, diagnosis, activity, pid, begdate, user, groupname) VALUES (NOW(), 'medical_problem', ?, ?, ?, ?, '2026-01-01', 'admin', 'Default')",
+            [$title, $diagnosis, $activity, $pid]
+        );
+        $this->problems[] = $id;
+        return $id;
     }
 
     /**

@@ -16,6 +16,8 @@ declare(strict_types=1);
 
 namespace OpenEMR\Services\FHIR\ServiceRequest;
 
+use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRProvenance;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRServiceRequest;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRAnnotation;
@@ -207,6 +209,12 @@ class FhirServiceRequestReferralService extends FhirServiceBase implements IPati
         foreach (self::reasons(self::text($record, 'refer_diag')) as $reason) {
             $serviceRequest->addReasonCode($reason);
         }
+        $patientId = $record['patient_id'] ?? null;
+        if (is_numeric($patientId)) {
+            foreach (self::problems((int)$patientId, self::text($record, 'refer_diag')) as $problem) {
+                $serviceRequest->addReasonReference($problem);
+            }
+        }
         $body = self::text($record, 'body');
         if ($body !== null) {
             $note = new FHIRAnnotation();
@@ -345,6 +353,43 @@ class FhirServiceRequestReferralService extends FhirServiceBase implements IPati
             $reasons[] = $concept;
         }
         return $reasons;
+    }
+
+    /**
+     * The patient's active problems (problem list items, served as Conditions) that carry one
+     * of the Referrer Diagnosis codes, as references.
+     *
+     * @return list<FHIRReference>
+     */
+    private static function problems(int $patientId, ?string $diagnosis): array
+    {
+        $references = [];
+        $seen = [];
+        foreach (explode(';', $diagnosis ?? '') as $entry) {
+            $entry = trim($entry);
+            if (!str_contains($entry, ':')) {
+                continue;
+            }
+            $rows = QueryUtils::fetchRecords(
+                "SELECT id, uuid, title FROM lists WHERE pid = ? AND type = 'medical_problem' AND activity = 1"
+                    . " AND CONCAT(';', REPLACE(diagnosis, ' ', ''), ';') LIKE ?",
+                [$patientId, '%;' . str_replace(' ', '', $entry) . ';%']
+            );
+            foreach ($rows as $row) {
+                if (!is_numeric($row['id'] ?? null) || isset($seen[(int)$row['id']])) {
+                    continue;
+                }
+                $seen[(int)$row['id']] = true;
+                // The problem list gives rows no uuid until something asks for one.
+                UuidRegistry::createMissingUuidForRow('lists', 'id', (int)$row['id']);
+                $uuid = QueryUtils::fetchSingleValue('SELECT uuid FROM lists WHERE id = ?', 'uuid', [(int)$row['id']]);
+                if (is_string($uuid)) {
+                    $title = is_string($row['title'] ?? null) && $row['title'] !== '' ? $row['title'] : null;
+                    $references[] = UtilsService::createRelativeReference('Condition', UuidRegistry::uuidToString($uuid), $title);
+                }
+            }
+        }
+        return $references;
     }
 
     /**

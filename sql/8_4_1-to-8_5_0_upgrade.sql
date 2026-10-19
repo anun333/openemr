@@ -425,3 +425,8 @@ INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`
 #IfNotRow2D layout_options form_id LBTref field_id refer_category
 INSERT INTO `layout_options` (`form_id`,`field_id`,`group_id`,`title`,`seq`,`data_type`,`uor`,`fld_length`,`max_length`,`list_id`,`titlecols`,`datacols`,`default_value`,`edit_options`,`description`,`fld_rows`) VALUES ('LBTref','refer_category','1','Referral Category', 10, 1,1, 0,  0,'referral_category',1,1,'' ,'' ,'What kind of referral this is: a specialty, behavioral health, or a social need', 0);
 #EndIf
+
+-- Referrer Diagnosis takes codes (#14710), where it is still the text field it was installed as. Text already in it stays.
+#IfRow3D layout_options form_id LBTref field_id refer_diag data_type 2
+UPDATE `layout_options` SET `data_type` = 15 WHERE `form_id` = 'LBTref' AND `field_id` = 'refer_diag' AND `data_type` = 2;
+#EndIf
