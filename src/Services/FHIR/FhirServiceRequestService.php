@@ -197,14 +197,17 @@ class FhirServiceRequestService extends FhirServiceBase implements
         if ($tokens === []) {
             return [true, true];
         }
+        // The order categories are the four in CATEGORY_MAP; any other category (referral,
+        // sdoh, an SDOH domain, a Referral Category code) is one only referrals carry.
+        $orderCodes = array_column(self::CATEGORY_MAP, 'code');
         $orders = false;
         $referrals = false;
         foreach ($tokens as $token) {
-            $code = str_contains($token, '|') ? substr($token, strrpos($token, '|') + 1) : $token;
-            if (trim($code) === FhirServiceRequestReferralService::CATEGORY_REFERRAL) {
-                $referrals = true;
-            } else {
+            $code = trim(str_contains($token, '|') ? substr($token, strrpos($token, '|') + 1) : $token);
+            if (in_array($code, $orderCodes, true)) {
                 $orders = true;
+            } else {
+                $referrals = true;
             }
         }
         return [$orders, $referrals];

@@ -21,6 +21,7 @@ namespace OpenEMR\Services;
 use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
+use OpenEMR\Services\FHIR\FhirTaskWriteRules;
 use OpenEMR\Services\Globals\GlobalConnectorsEnum;
 use OpenEMR\Services\Search\TokenSearchField;
 
@@ -72,13 +73,25 @@ class ReferralTaskService
         $referralUuid = self::text($referral, 'uuid');
         $patientId = $referral['patient_id'] ?? null;
         $owner = self::party($referral, 'performer');
-        if ($referralUuid === null || !is_numeric($patientId) || $owner === null || $this->hasTask($referralUuid, $owner[1])) {
+        if ($referralUuid === null || !is_numeric($patientId) || $owner === null) {
+            return null;
+        }
+        $priority = ReferralService::priorityForRisk($referral['refer_risk_level'] ?? null);
+        $existing = $this->taskFor($referralUuid, $owner[1]);
+        if ($existing !== null) {
+            // The Risk Level can change after the Task is made; an open Task follows it.
+            $status = $existing['status'] ?? null;
+            $uuid = $existing['uuid'] ?? null;
+            if (is_string($uuid) && is_string($status) && !in_array($status, FhirTaskWriteRules::FINAL_STATUSES, true) && ($existing['priority'] ?? null) !== $priority) {
+                $this->getTaskService()->update($uuid, ['priority' => $priority], $userId);
+            }
             return null;
         }
         $requester = self::party($referral, 'requester');
         return $this->getTaskService()->insert([
             'status' => 'requested',
             'intent' => 'order',
+            'priority' => $priority,
             'code' => 'fulfill',
             'focus_type' => 'ServiceRequest',
             'focus_uuid' => $referralUuid,
@@ -118,13 +131,19 @@ class ReferralTaskService
         }
     }
 
-    private function hasTask(string $referralUuid, string $ownerUuid): bool
+    /**
+     * The referral's Task for this recipient, as TaskService returns it, or null.
+     *
+     * @return ?array<mixed>
+     */
+    private function taskFor(string $referralUuid, string $ownerUuid): ?array
     {
         $tasks = $this->getTaskService()->search([
             'focus_uuid' => new TokenSearchField('focus_uuid', [$referralUuid], true),
             'owner_uuid' => new TokenSearchField('owner_uuid', [$ownerUuid], true),
         ])->getData();
-        return is_array($tasks) && $tasks !== [];
+        $task = is_array($tasks) ? ($tasks[0] ?? null) : null;
+        return is_array($task) ? $task : null;
     }
 
     /**

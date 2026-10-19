@@ -368,3 +368,60 @@ ALTER TABLE `task` ADD COLUMN `version` int(11) NOT NULL DEFAULT 1 COMMENT 'FHIR
 #IfMissingColumn transactions uuid
 ALTER TABLE `transactions` ADD `uuid` binary(16) DEFAULT NULL AFTER `id`, ADD UNIQUE KEY `uuid` (`uuid`);
 #EndIf
+
+-- Referral Category (#14710): a list, and a field for it on the referral form.
+#IfNotRow2D list_options list_id lists option_id referral_category
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('lists','referral_category','Referral Category',0,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id specialty
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','specialty','Specialty Care',10,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id behavioral_health
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','behavioral_health','Behavioral Health',20,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id food_insecurity
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','food_insecurity','Food Insecurity',30,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id housing_instability
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','housing_instability','Housing Instability',40,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id transportation_insecurity
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','transportation_insecurity','Transportation Insecurity',50,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id utilities_insecurity
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','utilities_insecurity','Utility Insecurity',60,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id financial_strain
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','financial_strain','Financial Strain',70,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id social_isolation
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','social_isolation','Social Isolation',80,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id childcare_needs
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','childcare_needs','Childcare Needs',90,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id digital_access
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','digital_access','Digital Access',100,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id interpersonal_safety
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','interpersonal_safety','Interpersonal Safety',110,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D list_options list_id referral_category option_id other
+INSERT INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_default`, `option_value`, `mapping`, `notes`, `codes`, `toggle_setting_1`, `toggle_setting_2`, `activity`, `subtype`, `edit_options`) VALUES ('referral_category','other','Other',900,0,0,'','','',0,0,1,'',1);
+#EndIf
+
+#IfNotRow2D layout_options form_id LBTref field_id refer_category
+INSERT INTO `layout_options` (`form_id`,`field_id`,`group_id`,`title`,`seq`,`data_type`,`uor`,`fld_length`,`max_length`,`list_id`,`titlecols`,`datacols`,`default_value`,`edit_options`,`description`,`fld_rows`) VALUES ('LBTref','refer_category','1','Referral Category', 10, 1,1, 0,  0,'referral_category',1,1,'' ,'' ,'What kind of referral this is: a specialty, behavioral health, or a social need', 0);
+#EndIf

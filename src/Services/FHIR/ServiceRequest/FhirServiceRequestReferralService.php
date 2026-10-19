@@ -26,6 +26,7 @@ use OpenEMR\FHIR\R4\FHIRElement\FHIRId;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRMarkdown;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRReference;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRRequestIntent;
+use OpenEMR\FHIR\R4\FHIRElement\FHIRRequestPriority;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRRequestStatus;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRString;
 use OpenEMR\FHIR\R4\FHIRResource\FHIRDomainResource;
@@ -59,6 +60,26 @@ class FhirServiceRequestReferralService extends FhirServiceBase implements IPati
     public const CATEGORY_REFERRAL_DISPLAY = 'Patient referral';
 
     private const PROFILE = 'http://hl7.org/fhir/us/core/StructureDefinition/us-core-servicerequest';
+
+    private const US_CORE_CATEGORY_SYSTEM = 'http://hl7.org/fhir/us/core/CodeSystem/us-core-category';
+
+    private const SDOHCC_SYSTEM = 'http://hl7.org/fhir/us/sdoh-clinicalcare/CodeSystem/SDOHCC-CodeSystemTemporaryCodes';
+
+    /**
+     * The Referral Category list's SDOH domains, by option id, as SDOH Clinical Care
+     * categories: the same domains and codes HistorySdohService gives the SDOH assessment.
+     */
+    private const SDOH_DOMAINS = [
+        'food_insecurity' => ['food-insecurity', 'Food Insecurity'],
+        'housing_instability' => ['housing-instability', 'Housing Instability'],
+        'transportation_insecurity' => ['transportation-insecurity', 'Transportation Insecurity'],
+        'utilities_insecurity' => ['utility-insecurity', 'Utility Insecurity'],
+        'financial_strain' => ['financial-insecurity', 'Financial Insecurity'],
+        'social_isolation' => ['social-connection', 'Social Connection'],
+        'childcare_needs' => ['material-hardship', 'Material Hardship'],
+        'digital_access' => ['digital-access', 'Digital Access'],
+        'interpersonal_safety' => ['intimate-partner-violence', 'Intimate Partner Violence'],
+    ];
 
     private ?ReferralService $referralService = null;
 
@@ -106,9 +127,6 @@ class FhirServiceRequestReferralService extends FhirServiceBase implements IPati
     {
         $category = $openEMRSearchParameters['category'] ?? null;
         $code = $openEMRSearchParameters['code'] ?? null;
-        if ($category instanceof TokenSearchField && !self::anyTokenMatches($category, [[FhirCodeSystemConstants::SNOMED_CT, self::CATEGORY_REFERRAL]])) {
-            return new ProcessingResult();
-        }
         $fields = [];
         foreach ($openEMRSearchParameters as $name => $field) {
             if (is_string($name) && $name !== 'category' && $name !== 'code' && $field instanceof ISearchField) {
@@ -117,13 +135,23 @@ class FhirServiceRequestReferralService extends FhirServiceBase implements IPati
         }
 
         $result = $this->getReferralService()->search($fields);
-        if (!$result->isValid() || !$code instanceof TokenSearchField) {
+        if (!$result->isValid() || (!$code instanceof TokenSearchField && !$category instanceof TokenSearchField)) {
             return $result;
         }
         $filtered = new ProcessingResult();
         $records = $result->getData();
         foreach (is_array($records) ? $records : [] as $record) {
-            if (is_array($record) && self::anyTokenMatches($code, self::codings(self::requestedService($record)))) {
+            if (!is_array($record)) {
+                continue;
+            }
+            $categoryCodings = [];
+            foreach (self::categories($record) as $concept) {
+                array_push($categoryCodings, ...self::codings($concept));
+            }
+            if (
+                (!$code instanceof TokenSearchField || self::anyTokenMatches($code, self::codings(self::requestedService($record))))
+                && (!$category instanceof TokenSearchField || self::anyTokenMatches($category, $categoryCodings))
+            ) {
                 $filtered->addData($record);
             }
         }
@@ -149,7 +177,13 @@ class FhirServiceRequestReferralService extends FhirServiceBase implements IPati
         $serviceRequest->setId($id);
         $serviceRequest->setStatus(new FHIRRequestStatus(['value' => self::text($record, 'status') ?? 'active']));
         $serviceRequest->setIntent(new FHIRRequestIntent(['value' => 'order']));
-        $serviceRequest->addCategory(self::referralConcept());
+        $priority = ReferralService::priorityForRisk($record['refer_risk_level'] ?? null);
+        if ($priority !== null) {
+            $serviceRequest->setPriority(new FHIRRequestPriority(['value' => $priority]));
+        }
+        foreach (self::categories($record) as $category) {
+            $serviceRequest->addCategory($category);
+        }
         $serviceRequest->setCode(self::requestedService($record));
 
         $puuid = self::text($record, 'puuid');
@@ -247,6 +281,37 @@ class FhirServiceRequestReferralService extends FhirServiceBase implements IPati
         return UtilsService::createCodeableConcept([
             self::CATEGORY_REFERRAL => ['code' => self::CATEGORY_REFERRAL, 'description' => self::CATEGORY_REFERRAL_DISPLAY, 'system' => FhirCodeSystemConstants::SNOMED_CT],
         ]);
+    }
+
+    /**
+     * The referral category (3457005), and the referral's Referral Category when it has one.
+     * An SDOH domain adds US Core's sdoh category and the domain's SDOH Clinical Care code;
+     * any other option gives its title, with the codes the option names in the list.
+     *
+     * @param array<mixed> $record
+     * @return list<FHIRCodeableConcept>
+     */
+    private static function categories(array $record): array
+    {
+        $categories = [self::referralConcept()];
+        $option = self::text($record, 'refer_category');
+        if ($option === null) {
+            return $categories;
+        }
+        $domain = self::SDOH_DOMAINS[$option] ?? null;
+        if ($domain !== null) {
+            $categories[] = UtilsService::createCodeableConcept(['sdoh' => ['code' => 'sdoh', 'description' => 'SDOH', 'system' => self::US_CORE_CATEGORY_SYSTEM]]);
+            $concept = UtilsService::createCodeableConcept([$domain[0] => ['code' => $domain[0], 'description' => $domain[1], 'system' => self::SDOHCC_SYSTEM]]);
+        } else {
+            $codes = array_filter(
+                (new CodeTypesService())->parseCodesIntoCodeableConcepts(self::text($record, 'category_codes') ?? ''),
+                static fn(mixed $code): bool => is_array($code) && is_string($code['system'] ?? null) && $code['system'] !== ''
+            );
+            $concept = UtilsService::createCodeableConcept($codes);
+        }
+        $concept->setText(new FHIRString(self::text($record, 'category_title') ?? $option));
+        $categories[] = $concept;
+        return $categories;
     }
 
     /**

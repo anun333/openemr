@@ -37,7 +37,16 @@ class ReferralService extends BaseService
     public const FORM_ID = 'LBTref';
 
     /** The lbt_data fields read, each as a column of the same name. */
-    private const FIELDS = ['refer_date', 'refer_from', 'refer_to', 'body', 'refer_diag', 'refer_related_code', 'reply_date'];
+    private const FIELDS = ['refer_date', 'refer_from', 'refer_to', 'body', 'refer_diag', 'refer_related_code', 'refer_risk_level', 'refer_category', 'reply_date'];
+
+    /** The Referral Category list. */
+    public const CATEGORY_LIST = 'referral_category';
+
+    /**
+     * The referral's Risk Level (list risklevel) as a FHIR request priority. Medium is the
+     * form's default, so it reads as routine; only a high-risk referral is urgent.
+     */
+    private const RISK_PRIORITIES = ['low' => 'routine', 'medium' => 'routine', 'high' => 'urgent'];
 
     /**
      * Address book types PractitionerService exposes as Practitioners, alongside users
@@ -101,7 +110,8 @@ class ReferralService extends BaseService
                 performer.uuid AS performer_uuid, " . $isPractitioner('performer') . " AS performer_is_practitioner,
                 (performer.id IS NOT NULL AND " . AddressBookOrganizationService::isOrganizationSql('performer') . ") AS performer_is_organization,
                 CASE WHEN " . AddressBookOrganizationService::isOrganizationSql('performer') . ' THEN ' . AddressBookOrganizationService::nameSql('performer') . "
-                    ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', performer.fname, performer.lname)), ''), performer.organization) END AS performer_name
+                    ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', performer.fname, performer.lname)), ''), performer.organization) END AS performer_name,
+                category.title AS category_title, category.codes AS category_codes
             FROM (
                 SELECT t.id, t.uuid, t.pid AS patient_id, patients.uuid AS puuid, t.date AS last_modified $fields,
                     (SELECT task.status FROM task WHERE task.focus_type = 'ServiceRequest' AND task.focus_uuid = t.uuid
@@ -113,7 +123,16 @@ class ReferralService extends BaseService
                 GROUP BY t.id, t.uuid, t.pid, patients.uuid, t.date
             ) AS r
             LEFT JOIN users AS requester ON requester.id = r.refer_from
-            LEFT JOIN users AS performer ON performer.id = r.refer_to";
+            LEFT JOIN users AS performer ON performer.id = r.refer_to
+            LEFT JOIN list_options AS category ON category.list_id = '" . self::CATEGORY_LIST . "' AND category.option_id = r.refer_category";
+    }
+
+    /**
+     * The FHIR priority (routine or urgent) for a referral's Risk Level, or null when it has none.
+     */
+    public static function priorityForRisk(mixed $riskLevel): ?string
+    {
+        return is_string($riskLevel) ? (self::RISK_PRIORITIES[strtolower(trim($riskLevel))] ?? null) : null;
     }
 
     /**
