@@ -125,10 +125,10 @@ if ($mode) {
         $transid = $newid;
     }
 
-    // The referral's FHIR Task, when the fhir_referral_tasks global is on (#14710).
+    // The referral's FHIR Task and its reply, when the fhir_referral_tasks global is on (#14710).
     if ($form_id === 'LBTref' && is_numeric($transid)) {
         $authUserId = $session->get('authUserID');
-        (new ReferralTaskService())->createForReferral((int)$transid, is_numeric($authUserId) ? (int)$authUserId : null);
+        (new ReferralTaskService())->afterSave((int)$transid, is_numeric($authUserId) ? (int)$authUserId : null);
     }
 
   // Set the AMC sent records flag

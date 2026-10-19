@@ -155,7 +155,7 @@ class PatientTransactionService extends BaseService
     }
 
     /**
-     * The referral's FHIR Task, when the fhir_referral_tasks global is on (#14710).
+     * The referral's FHIR Task and its reply, when the fhir_referral_tasks global is on (#14710).
      */
     private function createReferralTask(mixed $transactionId): void
     {
@@ -163,7 +163,7 @@ class PatientTransactionService extends BaseService
             return;
         }
         $userId = SessionWrapperFactory::getInstance()->getActiveSession()->get('authUserID');
-        (new ReferralTaskService())->createForReferral((int)$transactionId, is_numeric($userId) ? (int)$userId : null);
+        (new ReferralTaskService())->afterSave((int)$transactionId, is_numeric($userId) ? (int)$userId : null);
     }
 
     public function insertTransaction($pid, $data)
