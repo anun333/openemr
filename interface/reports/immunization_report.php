@@ -21,6 +21,7 @@ use OpenEMR\Common\Acl\AccessDeniedHelper;
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Session\SessionWrapperFactory;
+use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\Core\Header;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\PhoneNumberService;
@@ -83,6 +84,9 @@ if (!empty($_POST['form_get_hl7']) && ($_POST['form_get_hl7'] === 'true')) {
         "DATE_FORMAT(i.administered_date,'%Y%m%d') as administered_date, " .
         "i.lot_number as lot_number, " .
         "i.manufacturer as manufacturer, " .
+        "i.amount_administered, " .
+        "(SELECT lo.title FROM list_options AS lo WHERE lo.list_id = 'drug_units' AND lo.option_id = i.amount_administered_unit) AS amount_unit_title, " .
+        "(SELECT lo.codes FROM list_options AS lo WHERE lo.list_id = 'drug_units' AND lo.option_id = i.amount_administered_unit) AS amount_unit_codes, " .
         "concat(p.fname, '^', p.lname) as patientname, ";
 } else {
     $query .= "concat(p.fname, ' ',p.mname,' ', p.lname) as patientname, " .
@@ -220,14 +224,21 @@ if (!empty($_POST['form_get_hl7']) && ($_POST['form_get_hl7'] === 'true')) {
             "|" .
             "RE" .
             "$D";
+        // RXA-6 and RXA-7 (#14705): the recorded amount with its unit, as UCUM when the unit resolves
+        // to a UCUM code; 999 (not recorded) and no unit when there is no amount.
+        $amount = is_numeric($r['amount_administered'] ?? null) && (float)$r['amount_administered'] > 0
+            ? (string)($r['amount_administered'] + 0) : '999';
+        $unitTitle = is_string($r['amount_unit_title'] ?? null) ? $r['amount_unit_title'] : '';
+        $unitCode = UcumCode::forListOption($unitTitle, $r['amount_unit_codes'] ?? null);
+        $units = $amount === '999' || $unitTitle === '' ? '' : ($unitCode !== null ? $unitCode . '^' . $unitTitle . '^UCUM' : '^' . $unitTitle);
         $content .= "RXA|" .
             "0|" . // 1. Give Sub-ID Counter
             "1|" . // 2. Administrattion Sub-ID Counter
             $r['administered_date'] . "|" . // 3. Date/Time Start of Administration
             $r['administered_date'] . "|" . // 4. Date/Time End of Administration
             format_cvx_code($r['code']) . "^" . $r['immunizationtitle'] . "^" . "CVX" . "|" . // 5. Administration Code(CVX)
-            "999|" . // 6. Administered Amount. TODO: Immunization amt currently not captured in database, default to 999(not recorded)
-            "|" . // 7. Administered Units
+            $amount . "|" . // 6. Administered Amount, 999 when not recorded
+            $units . "|" . // 7. Administered Units
             "|" . // 8. Administered Dosage Form
             "|" . // 9. Administration Notes
             "|" . // 10. Administering Provider
