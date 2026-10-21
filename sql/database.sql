@@ -3,7 +3,7 @@
 --
 -- Keep v_database in sync with $v_database in version.php.
 -- CI will fail if they don't match.
--- v_database: 554
+-- v_database: 555
 --
 
 --
@@ -4274,24 +4274,24 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) V
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','2','tablet'     ,2,0,'NCI-CONCEPT-ID:C42998');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','3','capsule'    ,3,0,'NCI-CONCEPT-ID:C25158');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','4','solution'   ,4,0,'NCI-CONCEPT-ID:C42986');
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','5','tsp'        ,5,0,'NCI-CONCEPT-ID:C48544');
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','6','mL'         ,6,0,'NCI-CONCEPT-ID:C28254');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','5','tsp'        ,5,0,'NCI-CONCEPT-ID:C48544;UCUM:[tsp_us]');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','6','mL'         ,6,0,'NCI-CONCEPT-ID:C28254;UCUM:mL');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','7','units'      ,7,0,'NCI-CONCEPT-ID:C44278');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','8','inhalations',8,0,'NCI-CONCEPT-ID:C42944');
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','9','gtts(drops)',9,0,'NCI-CONCEPT-ID:C48491');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','9','gtts(drops)',9,0,'NCI-CONCEPT-ID:C48491;UCUM:[drp]');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','10','cream'   ,10,0,'NCI-CONCEPT-ID:C28944');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','11','ointment',11,0,'NCI-CONCEPT-ID:C42966');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_form','12','puff',12,0,'NCI-CONCEPT-ID:C42944');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','0',''          ,0,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','1','mg'    ,1,0,'NCI-CONCEPT-ID:C28253');
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','2','mg/1cc',2,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','3','mg/2cc',3,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','4','mg/3cc',4,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','5','mg/4cc',5,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','6','mg/5cc',6,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','7','mcg'   ,7,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','8','grams' ,8,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_units','9','mL' ,9,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','1','mg'    ,1,0,'NCI-CONCEPT-ID:C28253;UCUM:mg');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','2','mg/1cc',2,0,'UCUM:mg/mL');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','3','mg/2cc',3,0,'UCUM:mg/(2.mL)');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','4','mg/3cc',4,0,'UCUM:mg/(3.mL)');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','5','mg/4cc',5,0,'UCUM:mg/(4.mL)');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','6','mg/5cc',6,0,'UCUM:mg/(5.mL)');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','7','mcg'   ,7,0,'UCUM:ug');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','8','grams' ,8,0,'UCUM:g');
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, codes ) VALUES ('drug_units','9','mL' ,9,0,'UCUM:mL');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('drug_route', '0',''                 , 0,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, notes, codes ) VALUES ('drug_route', '1','Per Oris'         , 1,0, 'PO', 'NCI-CONCEPT-ID:C38288');
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, notes, codes ) VALUES ('drug_route', '2','Per Rectum'       , 2,0, 'OTH', 'NCI-CONCEPT-ID:C38295');
@@ -4533,24 +4533,24 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lists','proc_unit','Procedure Units', 1);
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','bool'       ,'Boolean'    ,  5);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','cu_mm'      ,'CU.MM'      , 10);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','fl'         ,'FL'         , 20);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','g_dl'       ,'G/DL'       , 30);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','gm_dl'      ,'GM/DL'      , 40);
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','cu_mm'      ,'CU.MM'      , 10,'UCUM:mm3');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','fl'         ,'FL'         , 20,'UCUM:fL');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','g_dl'       ,'G/DL'       , 30,'UCUM:g/dL');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','gm_dl'      ,'GM/DL'      , 40,'UCUM:g/dL');
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','hmol_l'     ,'HMOL/L'     , 50);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','iu_l'       ,'IU/L'       , 60);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','mg_dl'      ,'MG/DL'      , 70);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','mil_cu_mm'  ,'Mil/CU.MM'  , 80);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','percent'    ,'Percent'    , 90);
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','iu_l'       ,'IU/L'       , 60,'UCUM:[IU]/L');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','mg_dl'      ,'MG/DL'      , 70,'UCUM:mg/dL');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','mil_cu_mm'  ,'Mil/CU.MM'  , 80,'UCUM:10*6/mm3');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','percent'    ,'Percent'    , 90,'UCUM:%');
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','percentile' ,'Percentile' ,100);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','pg'         ,'PG'         ,110);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','ratio'      ,'Ratio'      ,120);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','thous_cu_mm','Thous/CU.MM',130);
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','pg'         ,'PG'         ,110,'UCUM:pg');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','ratio'      ,'Ratio'      ,120,'UCUM:{ratio}');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','thous_cu_mm','Thous/CU.MM',130,'UCUM:10*3/mm3');
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','units'      ,'Units'      ,140);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','units_l'    ,'Units/L'    ,150);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','days'       ,'Days'       ,600);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','weeks'      ,'Weeks'      ,610);
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','months'     ,'Months'     ,620);
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','units_l'    ,'Units/L'    ,150,'UCUM:U/L');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','days'       ,'Days'       ,600,'UCUM:d');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','weeks'      ,'Weeks'      ,610,'UCUM:wk');
+INSERT INTO list_options ( list_id, option_id, title, seq, codes ) VALUES ('proc_unit','months'     ,'Months'     ,620,'UCUM:mo');
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('proc_unit','oth'        ,'Other'      ,990);
 
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','ord_priority','Order Priorities', 1,0);

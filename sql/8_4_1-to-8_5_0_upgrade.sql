@@ -363,3 +363,36 @@ CREATE TABLE `task` (
 #IfMissingColumn task version
 ALTER TABLE `task` ADD COLUMN `version` int(11) NOT NULL DEFAULT 1 COMMENT 'FHIR meta.versionId: 1 on create, raised by each update (If-Match)';
 #EndIf
+
+-- #14698: the UCUM code each unit list option stands for, in its codes field (UCUM:mg), so that exports
+-- can send UCUM. Only options still carrying their installed title, and not already mapped, are changed;
+-- a site's own options and renamed ones are left for the site to map.
+#IfNotRow3D list_options list_id drug_units option_id 7 codes UCUM:ug
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mg') WHERE `list_id` = 'drug_units' AND `option_id` = '1' AND `title` = 'mg' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mg/mL') WHERE `list_id` = 'drug_units' AND `option_id` = '2' AND `title` = 'mg/1cc' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mg/(2.mL)') WHERE `list_id` = 'drug_units' AND `option_id` = '3' AND `title` = 'mg/2cc' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mg/(3.mL)') WHERE `list_id` = 'drug_units' AND `option_id` = '4' AND `title` = 'mg/3cc' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mg/(4.mL)') WHERE `list_id` = 'drug_units' AND `option_id` = '5' AND `title` = 'mg/4cc' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mg/(5.mL)') WHERE `list_id` = 'drug_units' AND `option_id` = '6' AND `title` = 'mg/5cc' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:ug') WHERE `list_id` = 'drug_units' AND `option_id` = '7' AND `title` = 'mcg' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:g') WHERE `list_id` = 'drug_units' AND `option_id` = '8' AND `title` = 'grams' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mL') WHERE `list_id` = 'drug_units' AND `option_id` = '9' AND `title` = 'mL' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:[tsp_us]') WHERE `list_id` = 'drug_form' AND `option_id` = '5' AND `title` = 'tsp' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mL') WHERE `list_id` = 'drug_form' AND `option_id` = '6' AND `title` = 'mL' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:[drp]') WHERE `list_id` = 'drug_form' AND `option_id` = '9' AND `title` = 'gtts(drops)' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mm3') WHERE `list_id` = 'proc_unit' AND `option_id` = 'cu_mm' AND `title` = 'CU.MM' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:fL') WHERE `list_id` = 'proc_unit' AND `option_id` = 'fl' AND `title` = 'FL' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:g/dL') WHERE `list_id` = 'proc_unit' AND `option_id` = 'g_dl' AND `title` = 'G/DL' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:g/dL') WHERE `list_id` = 'proc_unit' AND `option_id` = 'gm_dl' AND `title` = 'GM/DL' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:[IU]/L') WHERE `list_id` = 'proc_unit' AND `option_id` = 'iu_l' AND `title` = 'IU/L' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mg/dL') WHERE `list_id` = 'proc_unit' AND `option_id` = 'mg_dl' AND `title` = 'MG/DL' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:10*6/mm3') WHERE `list_id` = 'proc_unit' AND `option_id` = 'mil_cu_mm' AND `title` = 'Mil/CU.MM' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:%') WHERE `list_id` = 'proc_unit' AND `option_id` = 'percent' AND `title` = 'Percent' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:pg') WHERE `list_id` = 'proc_unit' AND `option_id` = 'pg' AND `title` = 'PG' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:{ratio}') WHERE `list_id` = 'proc_unit' AND `option_id` = 'ratio' AND `title` = 'Ratio' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:10*3/mm3') WHERE `list_id` = 'proc_unit' AND `option_id` = 'thous_cu_mm' AND `title` = 'Thous/CU.MM' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:U/L') WHERE `list_id` = 'proc_unit' AND `option_id` = 'units_l' AND `title` = 'Units/L' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:d') WHERE `list_id` = 'proc_unit' AND `option_id` = 'days' AND `title` = 'Days' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:wk') WHERE `list_id` = 'proc_unit' AND `option_id` = 'weeks' AND `title` = 'Weeks' AND `codes` NOT LIKE '%UCUM:%';
+UPDATE `list_options` SET `codes` = CONCAT_WS(';', NULLIF(`codes`, ''), 'UCUM:mo') WHERE `list_id` = 'proc_unit' AND `option_id` = 'months' AND `title` = 'Months' AND `codes` NOT LIKE '%UCUM:%';
+#EndIf
