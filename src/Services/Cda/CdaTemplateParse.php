@@ -13,6 +13,7 @@
 namespace OpenEMR\Services\Cda;
 
 use OpenEMR\BC\ServiceContainer;
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Events\CDA\CDAPostParseEvent;
 use OpenEMR\Events\CDA\CDAPreParseEvent;
@@ -1186,17 +1187,43 @@ class CdaTemplateParse
             for ($j = 0; $j < 9; $j++) {
                 $code = $vital_sign_data['organizer']['component'][$j]['observation']['code']['code'] ?? null;
                 if (!empty($vital_sign_data['organizer']['component'][$j]['observation']['entryRelationship'])) {
-                    $this->templateData['field_name_value_array']['vital_sign'][$i]['bps'] = $vital_sign_data['organizer']['component'][$j]['observation']['entryRelationship'][0]['observation']['value']['value'] ?? null;
-                    $this->templateData['field_name_value_array']['vital_sign'][$i]['bpd'] = $vital_sign_data['organizer']['component'][$j]['observation']['entryRelationship'][1]['observation']['value']['value'] ?? null;
+                    $this->templateData['field_name_value_array']['vital_sign'][$i]['bps'] = $this->vitalValueForColumn('bps', $vital_sign_data['organizer']['component'][$j]['observation']['entryRelationship'][0]['observation']['value'] ?? null);
+                    $this->templateData['field_name_value_array']['vital_sign'][$i]['bpd'] = $this->vitalValueForColumn('bpd', $vital_sign_data['organizer']['component'][$j]['observation']['entryRelationship'][1]['observation']['value'] ?? null);
                 } else {
                     if ($code !== null && array_key_exists($code, $vitals_array)) {
-                        $this->templateData['field_name_value_array']['vital_sign'][$i][$vitals_array[$code]] = $vital_sign_data['organizer']['component'][$j]['observation']['value']['value'] ?? null;
+                        $this->templateData['field_name_value_array']['vital_sign'][$i][$vitals_array[$code]] = $this->vitalValueForColumn($vitals_array[$code], $vital_sign_data['organizer']['component'][$j]['observation']['value'] ?? null);
                     }
                 }
             }
 
             $this->templateData['entry_identification_array']['vital_sign'][$i] = $i;
         }
+    }
+
+    /**
+     * A vital sign's value in the unit its form_vitals column is stored in (#14657): C-CDA
+     * documents send kg, cm and Cel as often as [lb_av], [in_i] and [degF], and storing the
+     * number as sent records 70 lb for a 70 kg patient. A value with no unit is kept as sent.
+     * One whose unit can't be converted is left out rather than stored in the wrong unit.
+     *
+     * @param mixed $observationValue the observation's value element: ['value' => …, 'unit' => …]
+     */
+    private function vitalValueForColumn(string $column, mixed $observationValue): mixed
+    {
+        $value = is_array($observationValue) ? ($observationValue['value'] ?? null) : null;
+        $unit = is_array($observationValue) ? ($observationValue['unit'] ?? null) : null;
+        if (!is_numeric($value) || !is_string($unit) || trim($unit) === '' || VitalUnits::storedUnit($column) === null) {
+            return $value;
+        }
+        $stored = VitalUnits::toStored($column, (float)$value, $unit);
+        if ($stored === null) {
+            ServiceContainer::getLogger()->warning('C-CDA vital sign left out: its unit cannot be converted to the stored unit', [
+                'column' => $column,
+                'unit' => $unit,
+                'stored_unit' => VitalUnits::storedUnit($column),
+            ]);
+        }
+        return $stored;
     }
 
     public function fetchPhysicalExamPerformedData($entry)
@@ -1241,7 +1268,7 @@ class CdaTemplateParse
             $is_negated = !empty($entry['observation']['negationInd'] ?? false);
             $code = $entry['observation']['code']['code'] ?? null;
             if ($code !== null && array_key_exists($code, $vitals_array)) {
-                $this->templateData['field_name_value_array']['vital_sign'][$i][$vitals_array[$code]] = $entry['observation']['value']['value'] ?? null;
+                $this->templateData['field_name_value_array']['vital_sign'][$i][$vitals_array[$code]] = $this->vitalValueForColumn($vitals_array[$code], $entry['observation']['value'] ?? null);
                 $this->templateData['field_name_value_array']['vital_sign'][$i]['vital_column'] = $vitals_array[$code] ?? '';
             } else {
                 // log missed exam

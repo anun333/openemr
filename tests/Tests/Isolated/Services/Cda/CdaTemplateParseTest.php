@@ -524,6 +524,68 @@ class CdaTemplateParseTest extends TestCase
         $this->assertSame(1, $this->getEntryId('vital_sign', 1));
     }
 
+    /**
+     * #14657: a vital sent in another unit is stored in its column's unit.
+     */
+    public function testFetchVitalSignDataConvertsToTheStoredUnit(): void
+    {
+        $observation = static fn (string $code, string $value, string $unit): array => ['observation' => [
+            'effectiveTime' => ['value' => '202201011030'],
+            'code' => ['code' => $code],
+            'value' => ['value' => $value, 'unit' => $unit],
+        ]];
+        $data = [
+            'organizer' => [
+                'id' => ['extension' => 'vs-ext', 'root' => 'vs-root'],
+                'component' => [
+                    $observation('8310-5', '37', 'Cel'),
+                    $observation('8302-2', '170', 'cm'),
+                    $observation('3141-9', '70', 'kg'),
+                    $observation('8287-5', '35', 'cm'),
+                    $observation('8867-4', '72', '/min'),
+                    $observation('39156-5', '24.2', 'kg/m2'),
+                ],
+            ],
+        ];
+
+        $this->parser->fetchVitalSignData($data);
+
+        $vital = $this->getFieldRecord('vital_sign', 1);
+        $this->assertEqualsWithDelta(98.6, $vital['temperature'], 1e-9);
+        $this->assertEqualsWithDelta(66.929134, $vital['height'], 1e-9);
+        $this->assertEqualsWithDelta(154.323584, $vital['weight'], 1e-9);
+        $this->assertEqualsWithDelta(13.779528, $vital['head_circ'], 1e-9);
+        $this->assertEqualsWithDelta(72.0, $vital['pulse'], 1e-9);
+        $this->assertEqualsWithDelta(24.2, $vital['BMI'], 1e-9);
+    }
+
+    public function testFetchVitalSignDataLeavesOutAUnitItCannotConvert(): void
+    {
+        $data = [
+            'organizer' => [
+                'id' => ['extension' => 'vs-ext'],
+                'component' => [
+                    0 => ['observation' => [
+                        'effectiveTime' => ['value' => '202201011030'],
+                        'code' => ['code' => '8302-2'],
+                        'value' => ['value' => '70', 'unit' => 'kg'],
+                    ]],
+                    1 => ['observation' => [
+                        'effectiveTime' => ['value' => '202201011030'],
+                        'code' => ['code' => '8310-5'],
+                        'value' => ['value' => '98.6', 'unit' => '[degF]'],
+                    ]],
+                ],
+            ],
+        ];
+
+        $this->parser->fetchVitalSignData($data);
+
+        $vital = $this->getFieldRecord('vital_sign', 1);
+        $this->assertNull($vital['height'], 'a height in kg is not stored as inches');
+        $this->assertEqualsWithDelta(98.6, $vital['temperature'], 1e-9);
+    }
+
     public function testFetchVitalSignDataSkipsWhenMissingEffectiveTime(): void
     {
         $data = [
