@@ -26,6 +26,8 @@ use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Common\Filesystem\SafeIncludeResolver;
 use OpenEMR\Common\ORDataObject\ContactAddress;
 use OpenEMR\Common\Session\SessionWrapperFactory;
+use OpenEMR\Common\Units\DrugIntervalPeriod;
+use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\CareTeamService;
@@ -1649,7 +1651,7 @@ class EncounterccdadispatchTable
     {
         $medications = '';
         $query = "select l.id, l.date_added, l.start_date, l.drug, l.dosage, l.quantity, l.size, l.substitute, l.drug_info_erx, l.active, SUBSTRING(l3.codes, LOCATE(':',l3.codes)+1, LENGTH(l3.codes)) AS route_code,
-                       l.rxnorm_drugcode, l1.title as unit, l1.codes as unit_code,l2.title as form,SUBSTRING(l2.codes, LOCATE(':',l2.codes)+1, LENGTH(l2.codes)) AS form_code, l3.title as route, l4.title as `interval`,
+                       l.rxnorm_drugcode, l1.title as unit, l1.codes as unit_code,l2.title as form,SUBSTRING(l2.codes, LOCATE(':',l2.codes)+1, LENGTH(l2.codes)) AS form_code, l3.title as route, l4.title as `interval`, l4.codes AS interval_codes,
                        u.title, u.fname, u.lname, u.mname, u.npi, u.street, u.streetb, u.city, u.state, u.zip, u.phonew1, l.note
                        ,u.id AS provider_id, l.date_modified, l.updated_by AS provenance_updated_by
                        from prescriptions as l
@@ -1681,6 +1683,8 @@ class EncounterccdadispatchTable
             $str = $unit . " " . Listener::z_xlt($row['route']) . " " . $row['dosage'] . " " . Listener::z_xlt($row['form'] . " " . $row['interval']);
 
             $active = $row['active'] > 0 ? 'active' : 'completed';
+            // the time between doses, for the PIVL period (#14705); none for p.r.n., a.c. and the like
+            $period = DrugIntervalPeriod::of($row['interval_codes'] ?? null, $row['interval'] ?? null);
 
             $start_date = '';
             $start_date_formatted = '';
@@ -1715,6 +1719,8 @@ class EncounterccdadispatchTable
     <route_code>" . xmlEscape($row['route_code'] ?: $row['route']) . "</route_code>
     <route>" . xmlEscape($row['route']) . "</route>
     <interval>" . xmlEscape(Listener::z_xlt($row['interval'])) . "</interval>
+    <period_value>" . xmlEscape((string)($period['value'] ?? '')) . "</period_value>
+    <period_unit>" . xmlEscape($period['unit'] ?? '') . "</period_unit>
     <start_date>" . xmlEscape($start_date) . "</start_date>
     <start_date_formatted>" . xmlEscape($row['start_date']) . "</start_date_formatted>
     <end_date>" . xmlEscape('') . "</end_date>
@@ -1921,11 +1927,13 @@ class EncounterccdadispatchTable
             DATE_FORMAT(administered_date,'%Y%m%d') AS administered_formatted, lo.title as route_of_administration,
             u.title, u.fname, u.mname, u.lname, u.npi, u.street, u.streetb, u.city, u.state, u.zip, u.phonew1,
             f.name, f.phone, SUBSTRING(lo.codes, LOCATE(':',lo.codes)+1, LENGTH(lo.codes)) AS route_code, lo.notes AS route_code_notes,
+            du.title AS dose_unit_title, du.codes AS dose_unit_codes,
             im.updated_by AS provenance_updated_by, im.update_date
             FROM immunizations AS im
             LEFT JOIN codes AS cd ON cd.code = im.cvx_code
             JOIN code_types AS ctype ON ctype.ct_key = 'CVX' AND ctype.ct_id=cd.code_type
             LEFT JOIN list_options AS lo ON lo.list_id = 'drug_route' AND lo.option_id = im.route
+            LEFT JOIN list_options AS du ON du.list_id = 'drug_units' AND du.option_id = im.amount_administered_unit
             LEFT JOIN users AS u ON u.id = im.administered_by_id
             LEFT JOIN facility AS f ON f.id = u.facility_id
             WHERE im.patient_id=? AND added_erroneously = 0";
@@ -1939,6 +1947,16 @@ class EncounterccdadispatchTable
                 , 'time' => $row['update_date']
             ];
             $provenanceXml = $this->getAuthorXmlForRecord($provenanceRecord, $pid, null);
+            // The dose (#14705), with its unit as UCUM: a drug_units option id, or a unit as a FHIR
+            // client sent it. A unit that isn't UCUM is left off rather than sent as one.
+            $doseValue = is_numeric($row['amount_administered'] ?? null) && (float)$row['amount_administered'] > 0
+                ? (string)$row['amount_administered'] : '';
+            $doseUnit = '';
+            if ($doseValue !== '') {
+                $doseUnit = (isset($row['dose_unit_title'])
+                    ? UcumCode::forListOption($row['dose_unit_title'], $row['dose_unit_codes'] ?? null)
+                    : UcumCode::of($row['amount_administered_unit'] ?? null)) ?? '';
+            }
 
             $immunizations .= "
         <immunization>" . $provenanceXml . "
@@ -1963,6 +1981,8 @@ class EncounterccdadispatchTable
         <note>" . xmlEscape($row['note']) . "</note>
         <route_of_administration>" . xmlEscape(Listener::z_xlt($row['route_of_administration'])) . "</route_of_administration>
         <route_code>" . (xmlEscape($row['route_code']) ?: xmlEscape($row['route_code_notes'])) . "</route_code>
+        <dose_value>" . xmlEscape($doseValue) . "</dose_value>
+        <dose_unit>" . xmlEscape($doseUnit) . "</dose_unit>
         <status>completed</status>
         <facility_name>" . xmlEscape($row['name']) . "</facility_name>
         <facility_phone>" . xmlEscape($row['phone']) . "</facility_phone>

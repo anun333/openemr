@@ -124,6 +124,14 @@ final class UcumCode
         'days' => 'd',
         'weeks' => 'wk',
         'months' => 'mo',
+        // ages
+        'day' => 'd',
+        'week' => 'wk',
+        'month' => 'mo',
+        'year' => 'a',
+        'years' => 'a',
+        'yr' => 'a',
+        'yrs' => 'a',
     ];
 
     /**
@@ -169,6 +177,15 @@ final class UcumCode
             }
         }
         return null;
+    }
+
+    /**
+     * The UCUM code for a unit list option (drug_units, drug_form, proc_unit): the
+     * UCUM entry in its codes field, or else its title read as a unit.
+     */
+    public static function forListOption(?string $title, ?string $codes): ?string
+    {
+        return self::fromCodes($codes) ?? self::of($title);
     }
 
     /**

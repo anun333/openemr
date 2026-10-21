@@ -2014,22 +2014,19 @@ class InternalToCdaConverter
         $effTime1->appendChild($high);
         $subAdmin->appendChild($effTime1);
 
-        $dosage = $this->xpathValue('dosage', $med);
-        $interval = $this->xpathValue('interval', $med);
-        $dosageFloat = floatval($dosage);
-        // Node.js only renders period when there's actual data
-        if ($dosageFloat > 0 || $interval !== '') {
+        // The period is the time between doses, a UCUM time quantity from the interval (#14705).
+        // It used to take its value from the dosage and its unit from the interval's title ("2 b.i.d.").
+        // An interval that isn't a period (p.r.n., a.c., stat) gets no PIVL_TS.
+        $periodValue = $this->xpathValue('period_value', $med);
+        $periodUnit = $this->xpathValue('period_unit', $med);
+        if ($periodValue !== '' && $periodUnit !== '') {
             $effTime2 = $this->output->createElement('effectiveTime');
             $this->setXsiType($effTime2, 'PIVL_TS');
             $effTime2->setAttribute('institutionSpecified', 'true');
             $effTime2->setAttribute('operator', 'A');
             $period = $this->createElement('period');
-            if ($dosageFloat > 0) {
-                $period->setAttribute('value', (string) $dosageFloat);
-            }
-            if ($interval !== '') {
-                $period->setAttribute('unit', $interval);
-            }
+            $period->setAttribute('value', $periodValue);
+            $period->setAttribute('unit', $periodUnit);
             $effTime2->appendChild($period);
             $subAdmin->appendChild($effTime2);
         }

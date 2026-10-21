@@ -286,6 +286,78 @@ class InternalToCdaConverterTest extends TestCase
     }
 
     /**
+     * The immunization dose goes out as a doseQuantity with its UCUM unit (#14705).
+     */
+    public function testImmunizationDoseQuantityIsEmitted(): void
+    {
+        $input = <<<'XML'
+            <CCDA>
+                <patient>
+                    <fname>Happy</fname>
+                    <lname>Kid</lname>
+                </patient>
+                <immunizations>
+                    <immunization>
+                        <extension>IMM-1</extension>
+                        <cvx_code>140</cvx_code>
+                        <code_text>Influenza</code_text>
+                        <administered_on>2015-07-22</administered_on>
+                        <status>completed</status>
+                        <dose_value>0.5</dose_value>
+                        <dose_unit>mL</dose_unit>
+                    </immunization>
+                </immunizations>
+            </CCDA>
+            XML;
+
+        $xpath = $this->xpathFor($input);
+        $dose = $xpath->query("//hl7:substanceAdministration/hl7:doseQuantity[@value='0.5'][@unit='mL']");
+        self::assertNotFalse($dose, 'Dose query must be valid');
+        self::assertSame(1, $dose->length, 'The dose and its UCUM unit are carried through');
+    }
+
+    /**
+     * A medication's PIVL_TS period is the time between doses (#14705), and a
+     * medication without one (p.r.n.) has no PIVL_TS. The period used to take
+     * its value from the dosage and its unit from the interval's title.
+     */
+    public function testMedicationPeriodIsATimeQuantity(): void
+    {
+        $medication = static fn (string $id, string $period): string => "
+                    <medication>
+                        <extension>$id</extension>
+                        <drug>Amoxicillin</drug>
+                        <rxnorm>308182</rxnorm>
+                        <dosage>2</dosage>
+                        <interval>b.i.d.</interval>
+                        $period
+                        <status>active</status>
+                    </medication>";
+        $input = '<CCDA><patient><fname>Happy</fname><lname>Kid</lname></patient><medications>'
+            . $medication('MED-1', '<period_value>12</period_value><period_unit>h</period_unit>')
+            . $medication('MED-2', '<period_value></period_value><period_unit></period_unit>')
+            . '</medications></CCDA>';
+
+        $xpath = $this->xpathFor($input);
+        $periods = $xpath->query("//hl7:effectiveTime[@xsi:type='PIVL_TS']/hl7:period");
+        self::assertNotFalse($periods, 'Period query must be valid');
+        self::assertSame(1, $periods->length, 'Only the medication with a period gets a PIVL_TS');
+        $period = $periods->item(0);
+        self::assertInstanceOf(\DOMElement::class, $period);
+        self::assertSame('12', $period->getAttribute('value'));
+        self::assertSame('h', $period->getAttribute('unit'));
+    }
+
+    private function xpathFor(string $input): DOMXPath
+    {
+        $converter = new InternalToCdaConverter();
+        $xpath = new DOMXPath($this->loadDom($converter->convert($input)));
+        $xpath->registerNamespace('hl7', 'urn:hl7-org:v3');
+        $xpath->registerNamespace('xsi', 'http://www.w3.org/2001/XMLSchema-instance');
+        return $xpath;
+    }
+
+    /**
      * Document-wide structural invariants, asserted as rules rather than per
      * section.
      *

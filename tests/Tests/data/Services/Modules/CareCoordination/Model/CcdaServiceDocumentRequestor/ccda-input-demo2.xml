@@ -369,6 +369,8 @@
     <route_code>C38288</route_code>
     <route>Per Oris</route>
     <interval>Daily</interval>
+    <period_value>1</period_value>
+    <period_unit>d</period_unit>
     <start_date>20140201</start_date>
     <start_date_formatted>2014-02-01</start_date_formatted>
     <end_date></end_date>

@@ -13,6 +13,7 @@ namespace OpenEMR\Services\FHIR\Observation\Trait;
 
 use BadMethodCallException;
 use InvalidArgumentException;
+use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\Common\Uuid\UuidMapping;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRObservation;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRProvenance;
@@ -258,9 +259,10 @@ trait FhirObservationTrait
                     if (!empty($valueUnit)) {
                         $valueQuantity->setUnit($valueUnit);
                         // Apply UCUM constraint (us-core-3) for standard units
-                        if ($this->shouldUseUCUM($valueUnit)) {
+                        $ucum = UcumCode::of($valueUnit);
+                        if ($ucum !== null) {
                             $valueQuantity->setSystem(new FHIRUri(FhirCodeSystemConstants::UNITS_OF_MEASURE));
-                            $valueQuantity->setCode($valueUnit);
+                            $valueQuantity->setCode($ucum);
                         }
                     }
                     $observation->setValueQuantity($valueQuantity);
@@ -439,9 +441,10 @@ trait FhirObservationTrait
                 if (!empty($component['value_unit'])) {
                     $valueQuantity->setUnit($component['value_unit']);
                     // Apply UCUM constraint (us-core-3) for standard units
-                    if ($this->shouldUseUCUM($component['value_unit'])) {
+                    $ucum = UcumCode::of($component['value_unit']);
+                    if ($ucum !== null) {
                         $valueQuantity->setSystem(new FHIRUri(FhirCodeSystemConstants::UNITS_OF_MEASURE));
-                        $valueQuantity->setCode($component['value_unit']);
+                        $valueQuantity->setCode($ucum);
                     }
                 }
                 $comp->setValueQuantity($valueQuantity);
@@ -596,13 +599,12 @@ trait FhirObservationTrait
     }
 
     /**
-     * Check if unit should use UCUM system (us-core-3 constraint)
+     * Check if unit should use UCUM system (us-core-3 constraint): when it resolves to a valid
+     * UCUM code. {score} and the other annotations are valid UCUM (#14702).
      */
     protected function shouldUseUCUM($unit): bool
     {
-        // Common non-UCUM units that shouldn't trigger UCUM system
-        $nonUCUMUnits = ['{score}', '{count}', '{ratio}', '{index}'];
-        return !in_array($unit, $nonUCUMUnits);
+        return UcumCode::of(is_string($unit) ? $unit : null) !== null;
     }
 
     public function getProvenanceService(): FhirProvenanceService

@@ -166,6 +166,15 @@ final class UcumCodeTest extends TestCase
         ];
     }
 
+    public function testForListOptionPrefersTheCodesField(): void
+    {
+        $this->assertSame('ug', UcumCode::forListOption('mcg', ''));
+        $this->assertSame('ug', UcumCode::forListOption('micrograms (site title)', 'UCUM:ug'));
+        $this->assertSame('mL', UcumCode::forListOption('mL', 'NCI-CONCEPT-ID:C28254'));
+        $this->assertNull(UcumCode::forListOption('tablet', 'NCI-CONCEPT-ID:C42998'));
+        $this->assertNull(UcumCode::forListOption(null, null));
+    }
+
     #[DataProvider('codesFields')]
     public function testFromCodesReadsTheUcumEntry(?string $codes, ?string $expected): void
     {

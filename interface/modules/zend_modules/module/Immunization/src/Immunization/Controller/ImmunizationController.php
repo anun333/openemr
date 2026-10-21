@@ -18,6 +18,8 @@ use Immunization\Model\ImmunizationTable;
 use Immunization\Model\PatientSelectionMarker;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
+use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\Common\Utils\ValidationUtils;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\PhoneNumberService;
@@ -542,7 +544,16 @@ class ImmunizationController extends AbstractActionController
                     $manufacturer_code = $this->getImmunizationTable()->getNotes($r['manufacturer'], 'Immunization_Manufacturer');
                     $immunization_info_source_code = $this->getImmunizationTable()->getNotes($r['information_source'], 'immunization_informationsource');
                     if ($administered_unit_title) {
-                        $units = $administered_unit_title . '^' . $administered_unit_title . '^UCUM^^^';
+                        // RXA-7 names UCUM only for a unit that resolves to a valid UCUM code (#14702);
+                        // the title is translated, so the code comes from the list option itself.
+                        $unitOption = QueryUtils::querySingleRow(
+                            "SELECT title, codes FROM list_options WHERE list_id = 'drug_units' AND option_id = ?",
+                            [$r['administered_unit']]
+                        );
+                        $unitCode = UcumCode::forListOption($unitOption['title'] ?? null, $unitOption['codes'] ?? null);
+                        $units = $unitCode !== null
+                            ? $unitCode . '^' . $administered_unit_title . '^UCUM^^^'
+                            : '^' . $administered_unit_title . '^^^^';
                     }
 
                     if ($r['manufacturer']) {

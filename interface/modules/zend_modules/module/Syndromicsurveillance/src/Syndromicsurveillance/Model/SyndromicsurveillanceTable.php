@@ -13,6 +13,7 @@
 namespace Syndromicsurveillance\Model;
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Units\UcumCode;
 
 class SyndromicsurveillanceTable
 {
@@ -429,7 +430,7 @@ class SyndromicsurveillanceTable
                     $row['code'] . "^^" . $row['table_code'] . "|" .    //3. Observation Identifier
                     "|" .    //4.
                     $row['ob_value'] . "|" .    //5. Observation Value
-                    $row['ob_unit'] . "^^UCUM|" .    //6. Units
+                    self::unitsField($row['ob_unit']) . "|" .    //6. Units
                     "|" .    //7.
                     "|" .    //8.
                     "|" .    //9.
@@ -550,5 +551,16 @@ class SyndromicsurveillanceTable
         }
 
         return $res_cur['notes'] ?? null;
+    }
+
+    /**
+     * OBX-6: the unit as UCUM when it resolves to a valid UCUM code (#14702), or else as text
+     * with no coding system.
+     */
+    private static function unitsField(mixed $unit): string
+    {
+        $text = is_string($unit) ? $unit : '';
+        $code = UcumCode::of($text);
+        return $code !== null ? $code . '^^UCUM' : ($text === '' ? '' : '^' . $text);
     }
 }

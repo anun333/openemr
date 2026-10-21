@@ -2,6 +2,7 @@
 
 namespace OpenEMR\Services\FHIR;
 
+use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRImmunization;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRCodeableConcept;
@@ -195,11 +196,29 @@ class FhirImmunizationService extends FhirServiceBase implements IResourceUSCIGP
             $immunizationResource->setLotNumber($dataRecord['lot_number']);
         }
 
-        if (!empty($dataRecord['administration_site'])) {
+        // The dose goes out whenever one was recorded (#14699). Its unit is a drug_units option id
+        // from the form and C-CDA import, or a unit as a FHIR client sent it; UCUM is claimed only
+        // for a unit that resolves to a valid UCUM code.
+        $amount = $dataRecord['amount_administered'] ?? null;
+        if (is_numeric($amount) && (float)$amount > 0) {
             $doseQuantity = new FHIRQuantity();
-            $doseQuantity->setValue($dataRecord['amount_administered']);
-            $doseQuantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
-            $doseQuantity->setCode($dataRecord['amount_administered_unit']);
+            $doseQuantity->setValue($amount);
+            $listTitle = $dataRecord['amount_administered_unit_title'] ?? null;
+            $stored = $dataRecord['amount_administered_unit'] ?? null;
+            if (is_string($listTitle)) {
+                $unitText = $listTitle;
+                $code = UcumCode::forListOption($listTitle, $dataRecord['amount_administered_unit_codes'] ?? null);
+            } else {
+                $unitText = is_string($stored) ? $stored : '';
+                $code = UcumCode::of($unitText);
+            }
+            if ($unitText !== '') {
+                $doseQuantity->setUnit($unitText);
+            }
+            if ($code !== null) {
+                $doseQuantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
+                $doseQuantity->setCode($code);
+            }
             $immunizationResource->setDoseQuantity($doseQuantity);
         }
 

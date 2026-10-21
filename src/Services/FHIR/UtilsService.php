@@ -16,6 +16,7 @@ namespace OpenEMR\Services\FHIR;
 
 use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\ORDataObject\ContactAddress;
+use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\FHIR\Config\ServerConfig;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIROperationOutcome;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRAddress;
@@ -120,15 +121,18 @@ class UtilsService
     public static function createQuantity($value, $unit, $code): FHIRQuantity
     {
         $quantity = new FHIRQuantity();
-        // if there is no code provided we should not populate it nor the unit value
-        // that way it becomes a SimpleQuantity variant of Quantity
+        // if there is no unit we populate neither it nor the code, so that it becomes a
+        // SimpleQuantity variant of Quantity
         if (!empty($unit)) {
             $quantity->setUnit($unit);
-            // only set the code if we have a unit as the unit is the textual display of the coded unit
-            if (!empty($code)) {
-                $quantity->setCode($code);
+            // The unit is the textual display of the coded unit. The UCUM system and code go out
+            // only when the code (or, without one, the unit) resolves to a valid UCUM code (#14702);
+            // otherwise the unit travels as text alone.
+            $ucum = UcumCode::of(is_string($code) && $code !== '' ? $code : (is_string($unit) ? $unit : null));
+            if ($ucum !== null) {
+                $quantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
+                $quantity->setCode($ucum);
             }
-            $quantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
         }
         $quantity->setValue($value);
         return $quantity;

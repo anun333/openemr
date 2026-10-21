@@ -308,7 +308,7 @@
                             <high nullFlavor="UNK"/>
                         </effectiveTime>
                         <effectiveTime xsi:type="PIVL_TS" institutionSpecified="true" operator="A">
-                            <period value="1" unit="Daily"/>
+                            <period value="1" unit="d"/>
                         </effectiveTime>
                         <routeCode code="C38288" displayName="Per Oris" codeSystem="2.16.840.1.113883.3.26.1.1"
                                    codeSystemName="Medication Route FDA"/>

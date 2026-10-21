@@ -82,6 +82,8 @@ class ImmunizationService extends BaseService
                 update_date,
                 amount_administered,
                 amount_administered_unit,
+                dose_unit.title AS amount_administered_unit_title,
+                dose_unit.codes AS amount_administered_unit_codes,
                 expiration_date,
                 route,
                 administration_site,
@@ -126,6 +128,8 @@ class ImmunizationService extends BaseService
                 ) patient ON immunizations.patient_id = patient.pid
                 LEFT JOIN codes as cvx ON cvx.code = immunizations.cvx_code
                 LEFT JOIN list_options as site ON site.option_id = immunizations.administration_site
+                LEFT JOIN list_options AS dose_unit ON dose_unit.list_id = 'drug_units'
+                    AND dose_unit.option_id = immunizations.amount_administered_unit
                 LEFT JOIN (
                     select
                         uuid AS provider_uuid

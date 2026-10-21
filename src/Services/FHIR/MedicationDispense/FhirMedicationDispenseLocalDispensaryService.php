@@ -11,6 +11,7 @@
 
 namespace OpenEMR\Services\FHIR\MedicationDispense;
 
+use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\FHIR\DomainModels\OpenEMRFHIRDosage;
 use OpenEMR\FHIR\DomainModels\OpenEMRFHIRTiming;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRMedicationDispense;
@@ -302,7 +303,11 @@ class FhirMedicationDispenseLocalDispensaryService extends FhirServiceBase imple
         // Quantity (mustSupport)
         $unit = $dataRecord['drug_form_title'] ?? '';
         if (!empty($dataRecord['quantity'])) {
-            $quantity = UtilsService::createQuantity($dataRecord['quantity'], $unit, $unit);
+            $quantity = UtilsService::createQuantity(
+                $dataRecord['quantity'],
+                $unit,
+                UcumCode::forListOption($unit, $dataRecord['drug_form_codes'] ?? null) ?? ''
+            );
             $medicationDispenseResource->setQuantity($quantity);
         }
 
@@ -471,7 +476,11 @@ class FhirMedicationDispenseLocalDispensaryService extends FhirServiceBase imple
 
         if (!empty($dataRecord['prescription_drug_size']) && is_numeric($dataRecord['prescription_drug_size'])) {
             $quantity = intval($dataRecord['prescription_drug_size']); // should be an integer value for dosage
-            $doseQuantity = UtilsService::createQuantity($quantity, $dataRecord['unit_title'] ?? '', $dataRecord['unit_title'] ?? '');
+            $doseQuantity = UtilsService::createQuantity(
+                $quantity,
+                $dataRecord['unit_title'] ?? '',
+                UcumCode::forListOption($dataRecord['unit_title'] ?? null, $dataRecord['unit_codes'] ?? null) ?? ''
+            );
             $doseAndRate = new FHIRDosageDoseAndRate();
             $doseAndRate->setDoseQuantity($doseQuantity);
             $dosage->addDoseAndRate($doseAndRate);
