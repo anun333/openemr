@@ -13,6 +13,7 @@
  */
 
 use OpenEMR\BC\Utilities;
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Core\OEGlobalsBag;
 
 require_once(__DIR__ . "/../../globals.php");
@@ -92,7 +93,7 @@ function vitals_report($pid, $encounter, $cols, $id, $print = true)
                 }
             } elseif ($key == "Weight") {
                 $value = floatval($value);
-                $convValue = number_format($value * 0.45359237, 2);
+                $convValue = number_format((float)VitalUnits::toMetric('weight', $value), 2);
                 $vitals .= "<td><div class='font-weight-bold d-inline-block'>" . xlt($key) . ": </div></td><td><div class='text' style='display:inline-block'>";
                 // show appropriate units
                 $mode = OEGlobalsBag::getInstance()->get('us_weight_format');
@@ -109,7 +110,7 @@ function vitals_report($pid, $encounter, $cols, $id, $print = true)
                 $vitals .= "</div></td>";
             } elseif (in_array($key, ["Height", "Waist Circ", "Head Circ"])) {
                 $value = floatval($value);
-                $convValue = number_format(round($value * 2.54, 1), 2);
+                $convValue = number_format(round((float)VitalUnits::toMetric('height', $value), 1), 2);
                 // show appropriate units
                 if (OEGlobalsBag::getInstance()->get('units_of_measurement') == 2) {
                     $vitals .= "<td><div class='font-weight-bold d-inline-block'>" . xlt($key) . ": </div></td><td><div class='text' style='display:inline-block'>" . text($convValue) . " " . xlt('cm') . " (" . text($value) . " " . xlt('in')  . ")</div></td>";
@@ -122,7 +123,7 @@ function vitals_report($pid, $encounter, $cols, $id, $print = true)
                 }
             } elseif ($key == "Temperature") {
                 $value = floatval($value);
-                $convValue = number_format((($value - 32) * 0.5556), 2);
+                $convValue = number_format((float)VitalUnits::toMetric('temperature', $value), 2);
                 // show appropriate units
                 if (OEGlobalsBag::getInstance()->get('units_of_measurement') == 2) {
                     $vitals .= "<td><div class='font-weight-bold d-inline-block'>" . xlt($key) . ": </div></td><td><div class='text' style='display:inline-block'>" . text($convValue) . " " . xlt('C') . " (" . text($value) . " " . xlt('F')  . ")</div></td>";

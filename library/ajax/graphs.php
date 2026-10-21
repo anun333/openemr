@@ -17,6 +17,7 @@ require_once(__DIR__ . "/../../interface/globals.php");
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Session\SessionWrapperFactory;
+use OpenEMR\Common\Units\UnitConverter;
 
 $session = SessionWrapperFactory::getInstance()->getActiveSession();
 CsrfUtils::checkCsrfInput(INPUT_POST, dieOnFail: true);
@@ -38,18 +39,18 @@ if (!AclMain::aclCheckCore('patients', 'med')) {
     exit;
 }
 
-// Conversion functions/constants
+// Conversions, by core's UCUM engine
 function convertFtoC($a): float
 {
-    return ($a - 32) * 0.5556;
+    return (float)UnitConverter::convert((float)$a, '[degF]', 'Cel');
 }
 function getLbstoKgMultiplier(): float
 {
-    return 0.45359237;
+    return (float)UnitConverter::convert(1.0, '[lb_av]', 'kg');
 }
 function getIntoCmMultiplier(): float
 {
-    return 2.54;
+    return (float)UnitConverter::convert(1.0, '[in_i]', 'cm');
 }
 function getIdealYSteps($a): int
 {

@@ -18,6 +18,9 @@ function LBFvbf_javascript(): void
 {
     global $formid;
 
+    // Conversion factors from core's UCUM engine, so this form converts as the server does.
+    echo "var vbfUnits = " . js_escape(\OpenEMR\Common\Units\VitalUnits::scriptFactors()) . ";\n\n";
+
     echo "// Compute Body Mass Index.
 function vbfComputeBMI() {
  var f = document.forms[0];
@@ -29,7 +32,7 @@ function vbfComputeBMI() {
   bmi = '';
  }
  else {
-  bmi = weight / height / height * 703;
+  bmi = weight / height / height * vbfUnits.bmiPerLbIn2;
   bmi = bmi.toFixed(1);
   if      (bmi > 42  ) stat = " . xlj('Obesity III') . ";
   else if (bmi > 34  ) stat = " . xlj('Obesity II') . ";
@@ -48,7 +51,7 @@ function vbf_height_cm_changed() {
  var f = document.forms[0];
  var cm = f.form_height_cm.value;
  if (cm == parseFloat(cm)) {
-  inch = cm / 2.54;
+  inch = cm / vbfUnits.cmPerIn;
   f.form_height_in.value = inch.toFixed(2);
  }
  else {
@@ -63,7 +66,7 @@ function vbf_height_in_changed() {
  var f = document.forms[0];
  var inch = f.form_height_in.value;
  if (inch == parseFloat(inch)) {
-  cm = inch * 2.54;
+  cm = inch * vbfUnits.cmPerIn;
   f.form_height_cm.value = cm.toFixed(2);
  }
  else {
@@ -78,7 +81,7 @@ function vbf_weight_kg_changed() {
  var f = document.forms[0];
  var kg = f.form_weight_kg.value;
  if (kg == parseFloat(kg)) {
-  lbs = kg / 0.45359237;
+  lbs = kg / vbfUnits.kgPerLb;
   f.form_weight_lbs.value = lbs.toFixed(2);
  }
  else {
@@ -93,7 +96,7 @@ function vbf_weight_lbs_changed() {
  var f = document.forms[0];
  var lbs = f.form_weight_lbs.value;
  if (lbs == parseFloat(lbs)) {
-  kg = lbs * 0.45359237;
+  kg = lbs * vbfUnits.kgPerLb;
   f.form_weight_kg.value = kg.toFixed(2);
  }
  else {
@@ -108,7 +111,7 @@ function vbf_temperature_c_changed() {
  var f = document.forms[0];
  var tc = f.form_temperature_c.value;
  if (tc == parseFloat(tc)) {
-  tf = tc * 9 / 5 + 32;
+  tf = (tc - vbfUnits.celAtZeroDegF) / vbfUnits.celPerDegF;
   f.form_temperature_f.value = tf.toFixed(2);
  }
  else {
@@ -122,7 +125,7 @@ function vbf_temperature_f_changed() {
  var f = document.forms[0];
  var tf = f.form_temperature_f.value;
  if (tf == parseFloat(tf)) {
-  tc = (tf - 32) * 5 / 9;
+  tc = tf * vbfUnits.celPerDegF + vbfUnits.celAtZeroDegF;
   f.form_temperature_c.value = tc.toFixed(2);
  }
  else {

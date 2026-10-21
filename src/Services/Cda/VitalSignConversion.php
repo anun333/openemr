@@ -3,7 +3,8 @@
 /**
  * Imperial-to-metric conversion for C-CDA vital signs exported in metric
  * units. OpenEMR stores weight in pounds, height in inches and temperature in
- * Fahrenheit, and an unrecorded measurement as 0.
+ * Fahrenheit, and an unrecorded measurement as 0. The conversions are core's
+ * UCUM engine's, through VitalUnits.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -16,18 +17,17 @@ declare(strict_types=1);
 
 namespace OpenEMR\Services\Cda;
 
+use OpenEMR\Common\Units\VitalUnits;
+
 final class VitalSignConversion
 {
-    private const KILOGRAMS_PER_POUND = 0.45359237;
-    private const CENTIMETRES_PER_INCH = 2.54;
-
     /**
      * Pounds to kilograms, to 0.01 kg. An unrecorded weight yields ''.
      */
     public static function poundsToKilograms(mixed $pounds): string
     {
         $value = self::recorded($pounds);
-        return $value === null ? '' : self::format($value * self::KILOGRAMS_PER_POUND, 2);
+        return $value === null ? '' : self::metric('weight', $value, 2);
     }
 
     /**
@@ -36,7 +36,7 @@ final class VitalSignConversion
     public static function inchesToCentimetres(mixed $inches): string
     {
         $value = self::recorded($inches);
-        return $value === null ? '' : self::format($value * self::CENTIMETRES_PER_INCH, 1);
+        return $value === null ? '' : self::metric('height', $value, 1);
     }
 
     /**
@@ -46,7 +46,7 @@ final class VitalSignConversion
     public static function fahrenheitToCelsius(mixed $fahrenheit): string
     {
         $value = self::recorded($fahrenheit);
-        return $value === null ? '' : self::format(($value - 32) * 5 / 9, 1);
+        return $value === null ? '' : self::metric('temperature', $value, 1);
     }
 
     /**
@@ -61,8 +61,8 @@ final class VitalSignConversion
         return $value === 0.0 ? null : $value;
     }
 
-    private static function format(float $value, int $decimals): string
+    private static function metric(string $field, float $stored, int $decimals): string
     {
-        return number_format($value, $decimals, '.', '');
+        return number_format((float)VitalUnits::toMetric($field, $stored), $decimals, '.', '');
     }
 }

@@ -11,33 +11,45 @@
 
 namespace OpenEMR\Common\Utils;
 
+use OpenEMR\Common\Units\UnitConverter;
+
+/**
+ * @deprecated Use OpenEMR\Common\Units\UnitConverter or VitalUnits, which return floats (or plain
+ *             decimal strings) from core's UCUM engine. These keep their old output, number_format()
+ *             with a thousands separator, for callers outside core.
+ */
 class MeasurementUtils
 {
     const MEASUREMENT_PRECISION = 6;
 
     public static function kgToLb(float|int $val): string
     {
-        return number_format($val * 2.20462262185, self::MEASUREMENT_PRECISION);
+        return self::convert($val, 'kg', '[lb_av]');
     }
     public static function lbToKg(float|int $val): string
     {
-        return number_format($val *  0.45359237, self::MEASUREMENT_PRECISION);
+        return self::convert($val, '[lb_av]', 'kg');
     }
     public static function cmToInches(float|int $val): string
     {
-        return number_format(round($val / 2.54, self::MEASUREMENT_PRECISION), self::MEASUREMENT_PRECISION);
+        return self::convert($val, 'cm', '[in_i]');
     }
     public static function inchesToCm(float|int $val): string
     {
-        return number_format(round($val * 2.54, self::MEASUREMENT_PRECISION), self::MEASUREMENT_PRECISION);
+        return self::convert($val, '[in_i]', 'cm');
     }
     public static function fhToCelsius(float|int $val): string
     {
-        return number_format(round(($val - 32) * (5 / 9), self::MEASUREMENT_PRECISION), self::MEASUREMENT_PRECISION);
+        return self::convert($val, '[degF]', 'Cel');
     }
 
     public static function celsiusToFh(float|int $val): string
     {
-        return number_format(round(((9 / 5) * $val) + 32, self::MEASUREMENT_PRECISION), self::MEASUREMENT_PRECISION);
+        return self::convert($val, 'Cel', '[degF]');
+    }
+
+    private static function convert(float|int $val, string $from, string $to): string
+    {
+        return number_format(round((float)UnitConverter::convert((float)$val, $from, $to), self::MEASUREMENT_PRECISION), self::MEASUREMENT_PRECISION);
     }
 }

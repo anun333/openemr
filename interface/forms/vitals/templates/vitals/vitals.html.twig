@@ -11,6 +11,9 @@
 <head>
     <title>{{ "Vitals"|xlt }}</title>
     {{ setupHeader(["datetime-picker","reason-code-widget"]) }}
+<script>
+    window.oeVitalsUnits = {{ vitalsUnitFactors|js_escape }};
+</script>
 <script src="{{ FORM_ACTION|attr }}/interface/forms/vitals/vitals.js?v={{ assetVersion|attr_url }}" type="text/javascript"></script>
 <script>
     let vitalsTranslations = {

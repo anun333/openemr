@@ -16,7 +16,7 @@ namespace OpenEMR\Services;
 use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Common\Forms\FormVitalDetails;
 use OpenEMR\Common\Forms\FormVitals;
-use OpenEMR\Common\Utils\MeasurementUtils;
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Events\Services\ServiceSaveEvent;
@@ -229,58 +229,21 @@ class VitalsService extends BaseService
 
         // add in all the measurement fields
 
-        $kgToLb = function ($val) {
-            if ($val != 0) {
-                return MeasurementUtils::lbToKg($val);
+        // form_vitals holds bare numbers in fixed units (VitalUnits). Each value is reported with
+        // its UCUM unit, converted for a metric site; an unrecorded length, weight or temperature
+        // (0) converts to null, as it always has.
+        $metric = $this->shouldConvertVitalMeasurements
+            && ($this->units_of_measurement == self::MEASUREMENT_PERSIST_IN_METRIC
+                || $this->units_of_measurement == self::MEASUREMENT_METRIC_ONLY);
+        foreach (VitalUnits::fields() as $field) {
+            $stored = VitalUnits::storedUnit($field);
+            $shown = $metric ? VitalUnits::metricUnit($field) : $stored;
+            if ($shown !== $stored) {
+                $value = $record[$field] ?? null;
+                $record[$field] = is_numeric($value) && $value != 0 ? VitalUnits::toMetricString($field, (float)$value) : null;
             }
-        };
-        $inchesToCm = function ($val) {
-            if ($val != 0) {
-                return MeasurementUtils::inchesToCm($val);
-            }
-        };
-        $fhToCelsius = function ($val) {
-            if ($val != 0) {
-                return MeasurementUtils::fhToCelsius($val);
-            }
-        };
-        $identity = (fn($val) => $val);
-
-        $convertArrayValue = function ($index, $converter, $unit, &$array): void {
-            $array[$index] = $converter($array[$index]);
-            $array[$index . "_unit"] = $unit;
-        };
-
-        if (
-            $this->shouldConvertVitalMeasurements
-                && ($this->units_of_measurement == self::MEASUREMENT_PERSIST_IN_METRIC
-                    || $this->units_of_measurement == self::MEASUREMENT_METRIC_ONLY)
-        ) {
-            $convertArrayValue('weight', $kgToLb, 'kg', $record);
-            $convertArrayValue('height', $inchesToCm, 'cm', $record);
-            $convertArrayValue('head_circ', $inchesToCm, 'cm', $record);
-            $convertArrayValue('waist_circ', $inchesToCm, 'cm', $record);
-            $convertArrayValue('temperature', $fhToCelsius, 'Cel', $record);
-        } else {
-            $convertArrayValue('weight', $identity, 'lb', $record);
-            $convertArrayValue('height', $identity, 'in', $record);
-            $convertArrayValue('head_circ', $identity, 'in', $record);
-            $convertArrayValue('waist_circ', $identity, 'in', $record);
-            $convertArrayValue('temperature', $identity, 'degF', $record);
+            $record[$field . "_unit"] = $shown;
         }
-
-        $convertArrayValue('pulse', $identity, '/min', $record);
-        $convertArrayValue('respiration', $identity, '/min', $record);
-        $convertArrayValue('BMI', $identity, 'kg/m2', $record);
-        $convertArrayValue('bps', $identity, 'mm[Hg]', $record);
-        $convertArrayValue('bpd', $identity, 'mm[Hg]', $record);
-
-        $convertArrayValue('inhaled_oxygen_concentration', $identity, '%', $record);
-        $convertArrayValue('oxygen_saturation', $identity, '%', $record);
-        $convertArrayValue('oxygen_flow_rate', $identity, 'L/min', $record);
-        $convertArrayValue('ped_weight_height', $identity, '%', $record);
-        $convertArrayValue('ped_bmi', $identity, '%', $record);
-        $convertArrayValue('ped_head_circ', $identity, '%', $record);
 
 
         $detailColumns = ['details_id', 'interpretation_codes', 'interpretation_title', 'vitals_column'

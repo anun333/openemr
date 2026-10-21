@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace OpenEMR\Tests\Isolated\Services\Qdm;
 
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Cqm\Qdm\Patient;
 use OpenEMR\Cqm\Qdm\PhysicalExamPerformed;
 use OpenEMR\Services\CodeTypesService;
@@ -50,8 +51,8 @@ class VitalSignsServiceTest extends TestCase
     public static function vitals(): array
     {
         $cases = [];
-        foreach (VitalSignsService::VITALS as $column => [$loinc, $unit]) {
-            $cases[$column] = [$loinc, $unit, '18.7'];
+        foreach (VitalSignsService::VITALS as $column => $loinc) {
+            $cases[$column] = [$loinc, (string)VitalUnits::storedUnit($column), '18.7'];
         }
         return $cases;
     }

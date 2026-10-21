@@ -34,6 +34,7 @@ declare(strict_types=1);
 
 namespace OpenEMR\Services\Qdm\Services;
 
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Cqm\Qdm\BaseTypes\DateTime;
 use OpenEMR\Cqm\Qdm\BaseTypes\Quantity;
 use OpenEMR\Cqm\Qdm\PhysicalExamPerformed;
@@ -43,16 +44,16 @@ use OpenEMR\Services\Qdm\QdmRecord;
 class VitalSignsService extends AbstractQdmService implements QdmServiceInterface
 {
     /**
-     * form_vitals column => [LOINC code, UCUM unit]. The Vitals form stores weight in
-     * pounds and height in inches whatever the display setting (units_of_measurement).
+     * form_vitals column => LOINC code. Each column's UCUM unit is the one it's stored in
+     * (VitalUnits): pounds and inches whatever the display setting (units_of_measurement).
      */
     public const VITALS = [
-        'bps' => ['8480-6', 'mm[Hg]'],
-        'bpd' => ['8462-4', 'mm[Hg]'],
-        'BMI' => ['39156-5', 'kg/m2'],
-        'ped_bmi' => ['59576-9', '%'],
-        'height' => ['8302-2', '[in_i]'],
-        'weight' => ['29463-7', '[lb_av]'],
+        'bps' => '8480-6',
+        'bpd' => '8462-4',
+        'BMI' => '39156-5',
+        'ped_bmi' => '59576-9',
+        'height' => '8302-2',
+        'weight' => '29463-7',
     ];
 
     /**
@@ -76,7 +77,8 @@ class VitalSignsService extends AbstractQdmService implements QdmServiceInterfac
     public function getSqlStatement(): string
     {
         $selects = [];
-        foreach (self::VITALS as $column => [$loinc, $unit]) {
+        foreach (self::VITALS as $column => $loinc) {
+            $unit = VitalUnits::storedUnit($column);
             // Blood pressure columns are text, kept as typed; read only plain positive numbers from them.
             $isText = in_array($column, ['bps', 'bpd'], true);
             $value = $isText ? "TRIM(v.`$column`)" : "v.`$column`";

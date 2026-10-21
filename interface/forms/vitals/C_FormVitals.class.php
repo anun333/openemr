@@ -23,6 +23,7 @@ use OpenEMR\Common\Forms\VitalsFieldRanges;
 use OpenEMR\Common\Session\SessionUtil;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Common\Twig\TwigContainer;
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\ListService;
@@ -365,6 +366,7 @@ class C_FormVitals
             ,'DONT_SAVE_LINK' => FormActionBarSettings::EXIT_URL
             ,'STYLE' => OEGlobalsBag::getInstance()->get('style')
             ,'units_of_measurement' => $this->units_of_measurement
+            ,'vitalsUnitFactors' => VitalUnits::scriptFactors()
             ,'MEASUREMENT_METRIC_ONLY' => FormVitals::MEASUREMENT_METRIC_ONLY
             ,'MEASUREMENT_USA_ONLY' => FormVitals::MEASUREMENT_USA_ONLY
             ,'MEASUREMENT_PERSIST_IN_METRIC' => FormVitals::MEASUREMENT_PERSIST_IN_METRIC
@@ -422,8 +424,8 @@ class C_FormVitals
 
         $weight = $_POST["weight"];
         $height = $_POST["height"];
-        if ($weight > 0 && $height > 0) {
-            $_POST["BMI"] = ($weight / $height / $height) * 703;
+        if (is_numeric($weight) && is_numeric($height) && $weight > 0 && $height > 0) {
+            $_POST["BMI"] = VitalUnits::bmi((float)$weight, (float)$height);
         }
 
         $bmi = $_POST["BMI"] ?? null;

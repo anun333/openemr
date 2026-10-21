@@ -213,6 +213,12 @@ function vitalsGetPrecision(node, defaultValue) {
     return precision;
 }
 
+// Conversion factors from core's UCUM engine (VitalUnits::scriptFactors()), which the page sets
+// in window.oeVitalsUnits, so that this script converts exactly as the server does.
+function vitalsUnitFactor(name) {
+    return window.oeVitalsUnits[name];
+}
+
 // TODO: we need to move all of these functions into the anonymous function and connect the events via event listeners
 function convUnit(system, unit, value)
 {
@@ -268,7 +274,7 @@ function convLbtoKg(value) {
         return 0;
     }
     else if (lb == parseFloat(lb)) {
-        kg = lb*0.45359237;
+        kg = lb*vitalsUnitFactor('kgPerLb');
         return kg;
     }
     else {
@@ -283,7 +289,7 @@ function convKgtoLb(value) {
         return 0;
     }
     else if (kg == parseFloat(kg)) {
-        lb = kg/0.45359237;
+        lb = kg/vitalsUnitFactor('kgPerLb');
         return lb;
     }
     else {
@@ -298,7 +304,7 @@ function convIntoCm(value) {
         return 0;
     }
     else if (inch == parseFloat(inch)) {
-        cm = inch*2.54;
+        cm = inch*vitalsUnitFactor('cmPerIn');
         return cm;
     }
     else {
@@ -313,7 +319,7 @@ function convCmtoIn(value) {
         return 0;
     }
     else if (cm == parseFloat(cm)) {
-        inch = cm/2.54;
+        inch = cm/vitalsUnitFactor('cmPerIn');
         return inch;
     }
     else {
@@ -327,7 +333,7 @@ function convFtoC(value) {
         return 0;
     }
     else if (Fdeg == parseFloat(Fdeg)) {
-        let Cdeg = (Fdeg-32)*5/9; // originally 0.5556 which is not precise!
+        let Cdeg = Fdeg*vitalsUnitFactor('celPerDegF') + vitalsUnitFactor('celAtZeroDegF');
         return Cdeg;
     }
     else {
@@ -342,7 +348,7 @@ function convCtoF(value) {
     }
     else if (Cdeg == parseFloat(Cdeg)) {
         Cdeg = parseFloat(Cdeg);
-        let Fdeg = (Cdeg*9/5)+32; // originally 0.5556 which is not precise when working with 2 digit decimal conversions!
+        let Fdeg = (Cdeg - vitalsUnitFactor('celAtZeroDegF'))/vitalsUnitFactor('celPerDegF');
         return Fdeg;
     }
     else {
@@ -376,7 +382,7 @@ function calculateBMI() {
         bmiNode.value = "";
     }
     else if((height == parseFloat(height)) && (weight == parseFloat(weight))) {
-        bmi = weight/height/height*703;
+        bmi = weight/height/height*vitalsUnitFactor('bmiPerLbIn2');
         bmi = bmi.toFixed(precision);
         bmiNode.value = bmi;
     }

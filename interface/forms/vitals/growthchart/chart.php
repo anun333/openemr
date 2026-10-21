@@ -46,6 +46,7 @@ use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Http\CurrentRequest;
 use OpenEMR\Common\Session\PatientSessionUtil;
 use OpenEMR\Common\Session\SessionWrapperFactory;
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\VitalsService;
 
@@ -120,7 +121,7 @@ function unitsWt($wt): string
 {
     global $isMetric;
     return $isMetric
-        ? sprintf('%s %s', number_format(($wt * 0.45359237), 2, '.', ''), xl('kg'))
+        ? sprintf('%s %s', number_format((float)VitalUnits::toMetric('weight', (float)$wt), 2, '.', ''), xl('kg'))
         : sprintf('%s %s', number_format($wt, 2), xl('lb'));
 }
 
@@ -129,19 +130,19 @@ function unitsDist($dist): string
 {
     global $isMetric;
     return $isMetric
-        ? sprintf('%s %s', number_format(($dist * 2.54), 2, '.', ''), xl('cm'))
+        ? sprintf('%s %s', number_format((float)VitalUnits::toMetric('height', (float)$dist), 2, '.', ''), xl('cm'))
         : sprintf('%s %s', number_format($dist, 2), xl('in'));
 }
 
 // convert vitals service data to US values for graphing
 function convertHeightToUs($height): float
 {
-    return $height * 0.393701;
+    return (float)VitalUnits::toStored('height', (float)$height, 'cm');
 }
 
 function convertWeightToUs($weight): float
 {
-    return $weight * 2.20462262185;
+    return (float)VitalUnits::toStored('weight', (float)$weight, 'kg');
 }
 /******************************/
 /******************************/
@@ -558,7 +559,7 @@ if (($_GET['html'] ?? null) == 1) {
                 echo("<div id='" . attr($point[2]) . "' class='graphic' style='position: absolute; top: " . attr($point[1]) . "pt; left: " . attr($point[0]) . "pt;'><img src='reddot.gif' /></div>\n");
             } elseif ($charttype == "2-20") {
                 // Draw BMI
-                $bmi = $weight / $height / $height * 703;
+                $bmi = (float)VitalUnits::bmi((float)$weight, (float)$height);
                 $bmi_x = $bmi_dot_x + $bmi_delta_x * ($age - 2);
                 $bmi_y = $bmi_dot_y - $bmi_delta_y * ($bmi - 10);
                 $point = convertpoint([$bmi_x,$bmi_y]);
@@ -712,7 +713,7 @@ foreach ($datapoints as $data) {
             imagefilledellipse($im, (int) $HT, (int) $WT, 10, 10, $color);
         } elseif ($charttype == "2-20") {
             // Draw BMI
-            $bmi = $weight / $height / $height * 703;
+            $bmi = (float)VitalUnits::bmi((float)$weight, (float)$height);
             $bmi_x = $bmi_dot_x + $bmi_delta_x * ($age - 2);
             $bmi_y = $bmi_dot_y - $bmi_delta_y * ($bmi - 10);
             imagefilledellipse($im, (int) $bmi_x, (int) $bmi_y, 10, 10, $color1);

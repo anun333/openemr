@@ -14,6 +14,7 @@
  */
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Units\VitalUnits;
 
 class eRxStore
 {
@@ -114,8 +115,8 @@ class eRxStore
 
         $data = formFetch("form_vitals", $result['id']);
 
-        $weight = number_format($data['weight'] * 0.45359237, 2);
-        $height = number_format(round($data['height'] * 2.54, 1), 2);
+        $weight = number_format((float)VitalUnits::toMetric('weight', (float)$data['weight']), 2);
+        $height = number_format(round((float)VitalUnits::toMetric('height', (float)$data['height']), 1), 2);
 
         return [
             'height' => $height,

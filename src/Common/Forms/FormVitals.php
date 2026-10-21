@@ -23,7 +23,7 @@ namespace OpenEMR\Common\Forms;
 
 use OpenEMR\Common\Forms\BmiCategory;
 use OpenEMR\Common\ORDataObject\ORDataObject;
-use OpenEMR\Common\Utils\MeasurementUtils;
+use OpenEMR\Common\Units\VitalUnits;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 
@@ -219,7 +219,7 @@ class FormVitals extends ORDataObject
 
     public function get_weight_metric(): string
     {
-        return MeasurementUtils::lbToKg($this->get_weight());
+        return self::metric('weight', $this->get_weight());
     }
     public function set_weight($w)
     {
@@ -244,7 +244,7 @@ class FormVitals extends ORDataObject
     }
     public function get_height_metric(): string
     {
-        return MeasurementUtils::inchesToCm($this->get_height());
+        return self::metric('height', $this->get_height());
     }
     public function set_height($h)
     {
@@ -258,7 +258,7 @@ class FormVitals extends ORDataObject
     }
     public function get_temperature_metric(): string
     {
-        return MeasurementUtils::fhToCelsius($this->get_temperature());
+        return self::metric('temperature', $this->get_temperature());
     }
     public function set_temperature($t)
     {
@@ -341,7 +341,7 @@ class FormVitals extends ORDataObject
     }
     public function get_waist_circ_metric(): string
     {
-        return MeasurementUtils::inchesToCm($this->get_waist_circ());
+        return self::metric('waist_circ', $this->get_waist_circ());
     }
     public function set_waist_circ($w)
     {
@@ -355,7 +355,7 @@ class FormVitals extends ORDataObject
     }
     public function get_head_circ_metric(): string
     {
-        return MeasurementUtils::inchesToCm($this->get_head_circ());
+        return self::metric('head_circ', $this->get_head_circ());
     }
     public function set_head_circ($h)
     {
@@ -599,5 +599,14 @@ class FormVitals extends ORDataObject
     {
         $this->authorized = $authorized;
         return $this;
+    }
+
+    /**
+     * A stored value in the unit a metric screen shows, to six places; an
+     * unset value converts as 0, as it did through MeasurementUtils.
+     */
+    private static function metric(string $field, mixed $stored): string
+    {
+        return VitalUnits::toMetricString($field, is_numeric($stored) ? (float)$stored : 0.0) ?? '';
     }
 }   // end of Form
