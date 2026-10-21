@@ -854,7 +854,8 @@ class FhirObservationVitalsService extends FhirServiceBase implements IPatientCo
             $quantity->setValue(floatval($record[$column]));
             // @see http://hl7.org/fhir/R4/observation-vitalsigns.html for the codes on this
             $unit = $record[$column . '_unit'] ?? null;
-            $code = UcumCode::of(is_string($unit) ? $unit : null);
+            $ucum = is_string($column) && is_array($record) ? ($record[$column . '_unit_ucum'] ?? null) : null;
+            $code = UcumCode::of($ucum ?? $unit);
             if ($code !== null) {
                 $quantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
                 $quantity->setCode(new FHIRCode($code));

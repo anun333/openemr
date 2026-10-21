@@ -230,19 +230,24 @@ class VitalsService extends BaseService
         // add in all the measurement fields
 
         // form_vitals holds bare numbers in fixed units (VitalUnits). Each value is reported with
-        // its UCUM unit, converted for a metric site; an unrecorded length, weight or temperature
-        // (0) converts to null, as it always has.
+        // its unit as before in *_unit (lb, in, degF; kg, cm, Cel on a metric site), and as UCUM in
+        // *_unit_ucum ([lb_av], [in_i], [degF]), so that readers of *_unit see no change. An
+        // unrecorded length, weight or temperature (0) converts to null, as it always has.
         $metric = $this->shouldConvertVitalMeasurements
             && ($this->units_of_measurement == self::MEASUREMENT_PERSIST_IN_METRIC
                 || $this->units_of_measurement == self::MEASUREMENT_METRIC_ONLY);
         foreach (VitalUnits::fields() as $field) {
             $stored = VitalUnits::storedUnit($field);
-            $shown = $metric ? VitalUnits::metricUnit($field) : $stored;
+            if ($stored === null) {
+                continue;
+            }
+            $shown = $metric ? (VitalUnits::metricUnit($field) ?? $stored) : $stored;
             if ($shown !== $stored) {
                 $value = $record[$field] ?? null;
                 $record[$field] = is_numeric($value) && $value != 0 ? VitalUnits::toMetricString($field, (float)$value) : null;
             }
-            $record[$field . "_unit"] = $shown;
+            $record[$field . "_unit"] = VitalUnits::label($shown);
+            $record[$field . "_unit_ucum"] = $shown;
         }
 
 
