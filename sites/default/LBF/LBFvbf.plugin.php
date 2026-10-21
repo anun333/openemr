@@ -19,7 +19,7 @@ function LBFvbf_javascript(): void
     global $formid;
 
     // Conversion factors from core's UCUM engine, so this form converts as the server does.
-    echo "var vbfUnits = " . js_escape(\OpenEMR\Common\Units\VitalUnits::scriptFactors()) . ";\n\n";
+    echo "var vbfUnits = " . json_encode(\OpenEMR\Common\Units\VitalUnits::scriptFactors(), JSON_THROW_ON_ERROR) . ";\n\n";
 
     echo "// Compute Body Mass Index.
 function vbfComputeBMI() {
