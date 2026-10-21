@@ -24,7 +24,7 @@ use OpenEMR\Cqm\Cql\Ucum\Ucum;
 
 final class UnitConverter
 {
-    public static function convert(float $value, ?string $fromUnit, ?string $toUnit): ?float
+    public static function convert(float $value, mixed $fromUnit, mixed $toUnit): ?float
     {
         $from = UcumCode::of($fromUnit);
         $to = UcumCode::of($toUnit);
@@ -41,7 +41,7 @@ final class UnitConverter
      * The value converted and rounded, as a plain decimal string ('1133.980925',
      * never '1,133.980925'), or null when it can't be converted.
      */
-    public static function format(float $value, ?string $fromUnit, ?string $toUnit, int $decimals): ?string
+    public static function format(float $value, mixed $fromUnit, mixed $toUnit, int $decimals): ?string
     {
         $converted = self::convert($value, $fromUnit, $toUnit);
         return $converted === null ? null : number_format(round($converted, $decimals), $decimals, '.', '');

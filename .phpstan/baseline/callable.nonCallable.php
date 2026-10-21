@@ -74,11 +74,6 @@ $ignoreErrors[] = [
 $ignoreErrors[] = [
     'message' => '#^Trying to invoke mixed but it\'s not a callable\\.$#',
     'count' => 1,
-    'path' => __DIR__ . '/../../src/Services/VitalsService.php',
-];
-$ignoreErrors[] = [
-    'message' => '#^Trying to invoke mixed but it\'s not a callable\\.$#',
-    'count' => 1,
     'path' => __DIR__ . '/../../tests/api/InternalApiTest.php',
 ];
 $ignoreErrors[] = [

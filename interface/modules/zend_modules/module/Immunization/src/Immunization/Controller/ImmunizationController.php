@@ -546,14 +546,17 @@ class ImmunizationController extends AbstractActionController
                     if ($administered_unit_title) {
                         // RXA-7 names UCUM only for a unit that resolves to a valid UCUM code (#14702);
                         // the title is translated, so the code comes from the list option itself.
-                        $unitOption = QueryUtils::querySingleRow(
+                        $unitTitle = is_string($administered_unit_title) ? $administered_unit_title : '';
+                        $unitOption = is_array($r) ? QueryUtils::querySingleRow(
                             "SELECT title, codes FROM list_options WHERE list_id = 'drug_units' AND option_id = ?",
-                            [$r['administered_unit']]
-                        );
-                        $unitCode = UcumCode::forListOption($unitOption['title'] ?? null, $unitOption['codes'] ?? null);
+                            [$r['administered_unit'] ?? '']
+                        ) : null;
+                        $unitCode = is_array($unitOption)
+                            ? UcumCode::forListOption($unitOption['title'] ?? null, $unitOption['codes'] ?? null)
+                            : null;
                         $units = $unitCode !== null
-                            ? $unitCode . '^' . $administered_unit_title . '^UCUM^^^'
-                            : '^' . $administered_unit_title . '^^^^';
+                            ? $unitCode . '^' . $unitTitle . '^UCUM^^^'
+                            : '^' . $unitTitle . '^^^^';
                     }
 
                     if ($r['manufacturer']) {

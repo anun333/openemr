@@ -115,8 +115,8 @@ class eRxStore
 
         $data = formFetch("form_vitals", $result['id']);
 
-        $weight = number_format((float)VitalUnits::toMetric('weight', (float)$data['weight']), 2);
-        $height = number_format(round((float)VitalUnits::toMetric('height', (float)$data['height']), 1), 2);
+        $weight = number_format((float)VitalUnits::toMetric('weight', (is_numeric($data['weight']) ? (float)$data['weight'] : 0.0)), 2);
+        $height = number_format(round((float)VitalUnits::toMetric('height', (is_numeric($data['height']) ? (float)$data['height'] : 0.0)), 1), 2);
 
         return [
             'height' => $height,

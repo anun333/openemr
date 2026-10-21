@@ -42,7 +42,7 @@ if (!AclMain::aclCheckCore('patients', 'med')) {
 // Conversions, by core's UCUM engine
 function convertFtoC($a): float
 {
-    return (float)UnitConverter::convert((float)$a, '[degF]', 'Cel');
+    return (float)UnitConverter::convert(is_numeric($a) ? (float)$a : 0.0, '[degF]', 'Cel');
 }
 function getLbstoKgMultiplier(): float
 {

@@ -121,7 +121,7 @@ function unitsWt($wt): string
 {
     global $isMetric;
     return $isMetric
-        ? sprintf('%s %s', number_format((float)VitalUnits::toMetric('weight', (float)$wt), 2, '.', ''), xl('kg'))
+        ? sprintf('%s %s', number_format((float)VitalUnits::toMetric('weight', is_numeric($wt) ? (float)$wt : 0.0), 2, '.', ''), xl('kg'))
         : sprintf('%s %s', number_format($wt, 2), xl('lb'));
 }
 
@@ -130,19 +130,19 @@ function unitsDist($dist): string
 {
     global $isMetric;
     return $isMetric
-        ? sprintf('%s %s', number_format((float)VitalUnits::toMetric('height', (float)$dist), 2, '.', ''), xl('cm'))
+        ? sprintf('%s %s', number_format((float)VitalUnits::toMetric('height', is_numeric($dist) ? (float)$dist : 0.0), 2, '.', ''), xl('cm'))
         : sprintf('%s %s', number_format($dist, 2), xl('in'));
 }
 
 // convert vitals service data to US values for graphing
 function convertHeightToUs($height): float
 {
-    return (float)VitalUnits::toStored('height', (float)$height, 'cm');
+    return (float)VitalUnits::toStored('height', is_numeric($height) ? (float)$height : 0.0, 'cm');
 }
 
 function convertWeightToUs($weight): float
 {
-    return (float)VitalUnits::toStored('weight', (float)$weight, 'kg');
+    return (float)VitalUnits::toStored('weight', is_numeric($weight) ? (float)$weight : 0.0, 'kg');
 }
 /******************************/
 /******************************/
@@ -559,7 +559,7 @@ if (($_GET['html'] ?? null) == 1) {
                 echo("<div id='" . attr($point[2]) . "' class='graphic' style='position: absolute; top: " . attr($point[1]) . "pt; left: " . attr($point[0]) . "pt;'><img src='reddot.gif' /></div>\n");
             } elseif ($charttype == "2-20") {
                 // Draw BMI
-                $bmi = (float)VitalUnits::bmi((float)$weight, (float)$height);
+                $bmi = (float)VitalUnits::bmi(is_numeric($weight) ? (float)$weight : 0.0, is_numeric($height) ? (float)$height : 0.0);
                 $bmi_x = $bmi_dot_x + $bmi_delta_x * ($age - 2);
                 $bmi_y = $bmi_dot_y - $bmi_delta_y * ($bmi - 10);
                 $point = convertpoint([$bmi_x,$bmi_y]);
@@ -713,7 +713,7 @@ foreach ($datapoints as $data) {
             imagefilledellipse($im, (int) $HT, (int) $WT, 10, 10, $color);
         } elseif ($charttype == "2-20") {
             // Draw BMI
-            $bmi = (float)VitalUnits::bmi((float)$weight, (float)$height);
+            $bmi = (float)VitalUnits::bmi(is_numeric($weight) ? (float)$weight : 0.0, is_numeric($height) ? (float)$height : 0.0);
             $bmi_x = $bmi_dot_x + $bmi_delta_x * ($age - 2);
             $bmi_y = $bmi_dot_y - $bmi_delta_y * ($bmi - 10);
             imagefilledellipse($im, (int) $bmi_x, (int) $bmi_y, 10, 10, $color1);

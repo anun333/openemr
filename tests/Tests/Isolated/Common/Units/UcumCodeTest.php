@@ -131,11 +131,7 @@ final class UcumCodeTest extends TestCase
 
     public function testEveryMappedCodeIsValid(): void
     {
-        $class = new \ReflectionClass(UcumCode::class);
-        $codes = array_merge(
-            array_values($class->getConstant('SPELLINGS')),
-            array_values($class->getConstant('READ_AS'))
-        );
+        $codes = array_merge(array_values(self::table('SPELLINGS')), array_values(self::table('READ_AS')));
         $this->assertGreaterThan(50, count($codes));
         foreach ($codes as $code) {
             $this->assertTrue(Ucum::instance()->isValid($code), $code);
@@ -144,9 +140,27 @@ final class UcumCodeTest extends TestCase
 
     public function testSpellingKeysAreLowerCase(): void
     {
-        foreach (array_keys((new \ReflectionClass(UcumCode::class))->getConstant('SPELLINGS')) as $key) {
+        foreach (array_keys(self::table('SPELLINGS')) as $key) {
             $this->assertSame(mb_strtolower($key), $key);
         }
+    }
+
+    /**
+     * One of UcumCode's private tables.
+     *
+     * @return array<string, string>
+     */
+    private static function table(string $name): array
+    {
+        $table = (new \ReflectionClass(UcumCode::class))->getConstant($name);
+        self::assertIsArray($table);
+        $out = [];
+        foreach ($table as $key => $code) {
+            self::assertIsString($key);
+            self::assertIsString($code);
+            $out[$key] = $code;
+        }
+        return $out;
     }
 
     /**

@@ -136,11 +136,12 @@ final class UcumCode
 
     /**
      * The UCUM code a unit string stands for, or null when it stands for none
-     * this can vouch for.
+     * this can vouch for. Anything but a string (a database null, say) stands
+     * for none.
      */
-    public static function of(?string $unit): ?string
+    public static function of(mixed $unit): ?string
     {
-        $unit = trim((string)$unit);
+        $unit = is_string($unit) ? trim($unit) : '';
         if ($unit === '') {
             return null;
         }
@@ -157,19 +158,22 @@ final class UcumCode
      * Whether a string is a UCUM code as written, meaning what UCUM says it
      * means: what an exporter may send as a UCUM code unchanged.
      */
-    public static function isUcum(?string $unit): bool
+    public static function isUcum(mixed $unit): bool
     {
         $code = self::of($unit);
-        return $code !== null && $code === trim((string)$unit);
+        return $code !== null && is_string($unit) && $code === trim($unit);
     }
 
     /**
      * The UCUM code in a list option's codes field (`NCI-CONCEPT-ID:C28253;UCUM:mg`),
      * or null when it has none or the one it has isn't valid.
      */
-    public static function fromCodes(?string $codes): ?string
+    public static function fromCodes(mixed $codes): ?string
     {
-        foreach (explode(';', (string)$codes) as $entry) {
+        if (!is_string($codes)) {
+            return null;
+        }
+        foreach (explode(';', $codes) as $entry) {
             $parts = explode(':', trim($entry), 2);
             if (count($parts) === 2 && strcasecmp($parts[0], self::CODES_PREFIX) === 0) {
                 $code = trim($parts[1]);
@@ -183,7 +187,7 @@ final class UcumCode
      * The UCUM code for a unit list option (drug_units, drug_form, proc_unit): the
      * UCUM entry in its codes field, or else its title read as a unit.
      */
-    public static function forListOption(?string $title, ?string $codes): ?string
+    public static function forListOption(mixed $title, mixed $codes): ?string
     {
         return self::fromCodes($codes) ?? self::of($title);
     }

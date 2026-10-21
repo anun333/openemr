@@ -111,9 +111,9 @@ final class VitalUnits
      * The UCUM code for a unit sent with a value for this column, reading `F`
      * and `C` as degrees for the temperature; null when it can't be placed.
      */
-    public static function unitFor(string $field, ?string $unit): ?string
+    public static function unitFor(string $field, mixed $unit): ?string
     {
-        $unit = trim((string)$unit);
+        $unit = is_string($unit) ? trim($unit) : '';
         if ($field === 'temperature' && isset(self::TEMPERATURE_SPELLINGS[$unit])) {
             return self::TEMPERATURE_SPELLINGS[$unit];
         }
@@ -145,7 +145,7 @@ final class VitalUnits
      * same thing; storing the bare number then would record 70 lb for a 70 kg
      * patient, so callers reject instead.
      */
-    public static function toStored(string $field, float $value, ?string $unit): ?float
+    public static function toStored(string $field, float $value, mixed $unit): ?float
     {
         $to = self::storedUnit($field);
         $from = self::unitFor($field, $unit);

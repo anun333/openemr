@@ -14,9 +14,9 @@ namespace OpenEMR\Common\Utils;
 use OpenEMR\Common\Units\UnitConverter;
 
 /**
- * @deprecated Use OpenEMR\Common\Units\UnitConverter or VitalUnits, which return floats (or plain
- *             decimal strings) from core's UCUM engine. These keep their old output, number_format()
- *             with a thousands separator, for callers outside core.
+ * Conversions through core's UCUM engine, kept with their old output (number_format() with a
+ * thousands separator) for callers outside core. New code should use OpenEMR\Common\Units\
+ * UnitConverter or VitalUnits, which return floats or plain decimal strings.
  */
 class MeasurementUtils
 {

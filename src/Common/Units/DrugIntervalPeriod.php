@@ -56,15 +56,15 @@ final class DrugIntervalPeriod
     /**
      * @return array{value: int, unit: string}|null the period, or null for an option that has none
      */
-    public static function of(?string $codes, ?string $title): ?array
+    public static function of(mixed $codes, mixed $title): ?array
     {
-        foreach (explode(';', (string)$codes) as $code) {
+        foreach (explode(';', is_string($codes) ? $codes : '') as $code) {
             $code = strtoupper(trim($code));
             if (isset(self::BY_CODE[$code])) {
                 return self::period(self::BY_CODE[$code]);
             }
         }
-        $title = mb_strtolower(trim((string)$title));
+        $title = mb_strtolower(trim(is_string($title) ? $title : ''));
         if (isset(self::BY_TITLE[$title])) {
             return self::period(self::BY_CODE[self::BY_TITLE[$title]]);
         }

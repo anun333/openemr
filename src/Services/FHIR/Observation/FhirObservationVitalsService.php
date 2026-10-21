@@ -21,6 +21,7 @@ use OpenEMR\Common\Uuid\UuidMapping;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRObservation;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRProvenance;
+use OpenEMR\FHIR\R4\FHIRElement\FHIRCode;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRCodeableConcept;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRCoding;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRDateTime;
@@ -28,6 +29,7 @@ use OpenEMR\FHIR\R4\FHIRElement\FHIRId;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRMeta;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRPeriod;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRQuantity;
+use OpenEMR\FHIR\R4\FHIRElement\FHIRString;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRUri;
 use OpenEMR\FHIR\R4\FHIRResource\FHIRDomainResource;
 use OpenEMR\FHIR\R4\FHIRResource\FHIRObservation\FHIRObservationComponent;
@@ -855,10 +857,10 @@ class FhirObservationVitalsService extends FhirServiceBase implements IPatientCo
             $code = UcumCode::of(is_string($unit) ? $unit : null);
             if ($code !== null) {
                 $quantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
-                $quantity->setCode($code);
-                $quantity->setUnit(VitalUnits::label($code));
+                $quantity->setCode(new FHIRCode($code));
+                $quantity->setUnit(new FHIRString(VitalUnits::label($code)));
             } elseif (is_string($unit) && $unit !== '') {
-                $quantity->setUnit($unit);
+                $quantity->setUnit(new FHIRString($unit));
             }
             return $quantity;
         }
@@ -1025,7 +1027,7 @@ class FhirObservationVitalsService extends FhirServiceBase implements IPatientCo
                 $code = UcumCode::of($component['value_unit'] ?? null); // mm[Hg]
                 if ($code !== null) {
                     $quantity->setSystem(new FHIRUri(FhirCodeSystemConstants::UNITS_OF_MEASURE));
-                    $quantity->setCode($code);
+                    $quantity->setCode(new FHIRCode($code));
                 }
                 $comp->setValueQuantity($quantity);
             } else {

@@ -5,15 +5,18 @@ namespace OpenEMR\Services\FHIR;
 use OpenEMR\Common\Units\UcumCode;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRImmunization;
+use OpenEMR\FHIR\R4\FHIRElement\FHIRCode;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRCodeableConcept;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRCoding;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRDate;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRDateTime;
+use OpenEMR\FHIR\R4\FHIRElement\FHIRDecimal;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRId;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRImmunizationStatusCodes;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRMeta;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRQuantity;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRReference;
+use OpenEMR\FHIR\R4\FHIRElement\FHIRString;
 use OpenEMR\FHIR\R4\FHIRResource\FHIRDomainResource;
 use OpenEMR\FHIR\R4\FHIRResource\FHIRImmunization\FHIRImmunizationPerformer;
 use OpenEMR\Services\BaseService;
@@ -202,7 +205,7 @@ class FhirImmunizationService extends FhirServiceBase implements IResourceUSCIGP
         $amount = $dataRecord['amount_administered'] ?? null;
         if (is_numeric($amount) && (float)$amount > 0) {
             $doseQuantity = new FHIRQuantity();
-            $doseQuantity->setValue($amount);
+            $doseQuantity->setValue(new FHIRDecimal((float)$amount));
             $listTitle = $dataRecord['amount_administered_unit_title'] ?? null;
             $stored = $dataRecord['amount_administered_unit'] ?? null;
             if (is_string($listTitle)) {
@@ -213,11 +216,11 @@ class FhirImmunizationService extends FhirServiceBase implements IResourceUSCIGP
                 $code = UcumCode::of($unitText);
             }
             if ($unitText !== '') {
-                $doseQuantity->setUnit($unitText);
+                $doseQuantity->setUnit(new FHIRString($unitText));
             }
             if ($code !== null) {
                 $doseQuantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
-                $doseQuantity->setCode($code);
+                $doseQuantity->setCode(new FHIRCode($code));
             }
             $immunizationResource->setDoseQuantity($doseQuantity);
         }

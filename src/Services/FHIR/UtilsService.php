@@ -131,7 +131,7 @@ class UtilsService
             $ucum = UcumCode::of(is_string($code) && $code !== '' ? $code : (is_string($unit) ? $unit : null));
             if ($ucum !== null) {
                 $quantity->setSystem(FhirCodeSystemConstants::UNITS_OF_MEASURE);
-                $quantity->setCode($ucum);
+                $quantity->setCode(new FHIRCode($ucum));
             }
         }
         $quantity->setValue($value);
