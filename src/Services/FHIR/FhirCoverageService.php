@@ -343,6 +343,8 @@ class FhirCoverageService extends FhirServiceBase implements IPatientCompartment
      * @param array $dataRecord
      * @return string
      */
+    // Twin (insurance-reference): DEFAULT 5 (#15038): Coverage.status stays derived from the dates, as now.
+    // US Core's note would send active and let period speak; that is a change to this one method.
     private function determineStatus($dataRecord): string
     {
         $now = date('Y-m-d');

@@ -82,6 +82,8 @@ final class EffectiveInsuranceRule
             if ($held !== null && !self::outranks($start, $id, $held['start'], $held['id'])) {
                 continue;
             }
+            // Twin (insurance-reference): DEFAULT 3 (#15038): both conventions; a winner with no company
+            // ('', '0', NULL) leaves its level without coverage, whatever wrote it.
             $companyId = self::positiveInt($row['provider'] ?? null);
             $winners[$level->value] = [
                 'start' => $start,
