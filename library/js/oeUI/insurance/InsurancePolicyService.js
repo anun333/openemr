@@ -185,31 +185,15 @@ export class InsurancePolicyService
     }
 
     sortInsurancesByDate(insurances) {
-        let futureDate = new Date();
+        // Twin (insurance-reference): the policy in force today comes first, as the
+        // coverage service chooses it (start on or before today, end on or after it,
+        // a missing start or end open); master put an open or future end first, so
+        // next year's card showed as current.
+        let today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let inForce = (p) => (p.date === null || p.date <= today) && (p.date_end === null || p.date_end >= today) ? 1 : 0;
         insurances.sort((a, b) => {
-            // since we can add / update policies in JS land, we need to handle the sort order here
-            // need to convert the following mysql order by to js
-            //         . ", (`date_end` is null or `date_end` > NOW()) DESC"
-            //         . ", (`date_end` IS NOT NULL AND `date_end` > NOW()) DESC"
-            //         . ", `date` DESC, `date_end` DESC, `policy_number` ASC";
-            // we want to sort by date_end first so that the most current one is first
-            let dateEndNullA = a.date_end === null;
-            let dateEndNullB = b.date_end === null;
-            let dateEndFutureA = !dateEndNullA && a.date_end > futureDate;
-            let dateEndFutureB = !dateEndNullB && b.date_end > futureDate;
-            let dateEndNullOrFutureA = dateEndNullA || dateEndFutureA ? 1 : 0;
-            let dateEndNullOrFutureB = dateEndNullB || dateEndFutureB ? 1 : 0;
-            let dateEndNotNullAndFutureA = !dateEndNullA && dateEndFutureA ? 1 : 0;
-            let dateEndNotNullAndFutureB = !dateEndNullB && dateEndFutureB ? 1 : 0;
-
-            let sortIndex = 0;
-            // b - a for descending order => (`date_end` is null or `date_end` > NOW()) DESC
-            sortIndex += dateEndNullOrFutureB - dateEndNullOrFutureA;
-            if (sortIndex !== 0) {
-                return sortIndex;
-            }
-            // b - a for descending order => (`date_end` IS NOT NULL AND `date_end` > NOW()) DESC
-            sortIndex += dateEndNotNullAndFutureB - dateEndNotNullAndFutureA;
+            let sortIndex = inForce(b) - inForce(a);
             if (sortIndex !== 0) {
                 return sortIndex;
             }
