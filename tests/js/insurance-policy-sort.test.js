@@ -74,6 +74,24 @@ describe('sortInsurancesByDate', () => {
         ])).toEqual(['ACTIVE', 'ENDED']);
     });
 
+    test('twin: next year\'s card does not come before the policy in force today', () => {
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        expect(sorted([
+            policy('CURRENT', day('2020-01-01')),
+            policy('NEXT-YEAR', nextYear),
+        ])).toEqual(['CURRENT', 'NEXT-YEAR']);
+    });
+
+    test('twin: a policy ending today is still in force today', () => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        expect(sorted([
+            policy('OPEN-OLD', day('2019-01-01')),
+            policy('ENDS-TODAY', day('2024-01-01'), today),
+        ])).toEqual(['ENDS-TODAY', 'OPEN-OLD']);
+    });
+
     test('ties fall through to the policy number', () => {
         expect(sorted([
             policy('B', null),
