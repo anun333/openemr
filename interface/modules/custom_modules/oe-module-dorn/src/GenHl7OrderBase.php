@@ -13,6 +13,8 @@
 namespace OpenEMR\Modules\Dorn;
 
 use InsuranceCompany;
+use OpenEMR\Services\Insurance\CoverageDay;
+use OpenEMR\Services\InsuranceService;
 
 class GenHl7OrderBase
 {
@@ -226,26 +228,11 @@ class GenHl7OrderBase
      */
     public function loadPayerInfo($pid, $date = ''): array
     {
-        if (empty($date)) {
-            $date = date('Y-m-d');
-        }
-
+        // Twin (insurance-reference): the coverage service's policies in force
+        // on the day; master ignored the end date.
+        $day = CoverageDay::forVisit($date, CoverageDay::today());
         $payers = [];
-        $dres = sqlStatement("SELECT * FROM insurance_data WHERE pid = ? AND (date <= ? OR date IS NULL) ORDER BY type ASC, date DESC", [$pid, $date]);
-        $prevtype = '';
-        // type is primary, secondary or tertiary
-        while ($drow = sqlFetchArray($dres)) {
-            if (strcmp($prevtype, (string) $drow['type']) == 0) {
-                continue;
-            }
-
-            $prevtype = $drow['type'] ?? '';
-            // Very important to check for a missing provider because
-            // that indicates no insurance as of the given date.
-            if (empty($drow['provider'] ?? '')) {
-                continue;
-            }
-
+        foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $drow) {
             $ins = count($payers);
             $crow = sqlQuery("SELECT * FROM insurance_companies WHERE id = ?", [$drow['provider']]);
             $orow = new InsuranceCompany($drow['provider']);
@@ -260,16 +247,11 @@ class GenHl7OrderBase
 
     public function loadGuarantorInfo($pid, $date = ''): array
     {
-        if (empty($date)) {
-            $date = date('Y-m-d');
-        }
+        // Twin (insurance-reference): the first policy in force on the day.
+        $day = CoverageDay::forVisit($date, CoverageDay::today());
         $guarantors = [];
-        $gres = sqlStatement("SELECT * FROM insurance_data WHERE pid = ? AND date <= ? ORDER BY type ASC, date DESC LIMIT 1", [$pid, $date]);
-        // type is primary, secondary or tertiary
-        while ($drow = sqlFetchArray($gres)) {
-            $gnt = count($guarantors);
-            $guarantors[$gnt] = [];
-            $guarantors[$gnt]['data'] = $drow;
+        foreach (array_slice((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day), 0, 1) as $drow) {
+            $guarantors[] = ['data' => $drow];
         }
         return $guarantors;
     }
