@@ -402,7 +402,16 @@ STYLES;
             $pdfContent .= '</tr>';
         }
 
-        $primary = sqlQuery("SELECT i.*,ic.name,ic.id FROM insurance_data i join insurance_companies ic ON i.provider=ic.id WHERE i.pid=? and i.type='primary' ORDER BY i.date DESC LIMIT 1", [$pid]);
+        // Twin (insurance-reference): the primary in force on the lab day (DEFAULT 1, #15038:
+        // collection date, else order date), as the HL7 IN1 sends it; id is the company's, as before.
+        $primary = [];
+        $labDay = \OpenEMR\Services\Insurance\CoverageDay::forLabOrder($procedure['date_collected'] ?? null, $procedure['date_ordered'] ?? null, \OpenEMR\Services\Insurance\CoverageDay::today());
+        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows((int)$pid, $labDay) as $policyRow) {
+            if ($policyRow['type'] === 'primary') {
+                $company = sqlQuery("SELECT name, id FROM insurance_companies WHERE id = ?", [$policyRow['provider']]);
+                $primary = array_merge($policyRow, is_array($company) ? $company : []);
+            }
+        }
         $billtype = "Unknown";
         switch (trim((string) $procedure['billing_type'])) {
             case 'T':
