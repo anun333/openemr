@@ -309,7 +309,9 @@ class PatientMergeService
                 continue;
             }
 
-            if (in_array($tableName, self::IDENTITY_TABLES, true)) {
+            if ($tableName === 'insurance_data') {
+                $this->moveInsurance($sourcePid, $targetPid, $log);
+            } elseif (in_array($tableName, self::IDENTITY_TABLES, true)) {
                 $this->deleteRows($tableName, 'pid', $sourcePid, $targetPid, $log);
             } elseif ($tableName === 'chart_tracker') {
                 $this->updateRows($tableName, 'ct_pid', $sourcePid, $targetPid, $log);
@@ -413,6 +415,33 @@ class PatientMergeService
             'delete',
             "Deleted rows with $columnName = $sourcePid in table $tableName"
         );
+    }
+
+    /**
+     * Twin (insurance-reference), TWIN CHOICE (no maintainer has been asked):
+     * the source chart's policies move with its encounters, claims and
+     * payments, so a secondary claim or a rebill for a moved visit still finds
+     * the coverage it had (master deleted them). A policy whose level and start
+     * the target already has can't move (the pid-type-date key) and is
+     * deleted, as before: the target's wins.
+     */
+    private function moveInsurance(int $sourcePid, int $targetPid, PatientMergeLog $log): void
+    {
+        $count = $this->countRows('insurance_data', 'pid', $sourcePid);
+        if ($count === 0) {
+            return;
+        }
+        $log->add("UPDATE insurance_data (move the source's policies that don't collide, delete the rest) ($count)");
+        if (!$this->production) {
+            return;
+        }
+        QueryUtils::sqlStatementThrowException(
+            "UPDATE `insurance_data` AS `s` LEFT JOIN `insurance_data` AS `t` ON `t`.`pid` = ? AND `t`.`type` = `s`.`type` AND `t`.`date` = `s`.`date`"
+            . " SET `s`.`pid` = ? WHERE `s`.`pid` = ? AND `t`.`id` IS NULL",
+            [$targetPid, $targetPid, $sourcePid]
+        );
+        QueryUtils::sqlStatementThrowException("DELETE FROM `insurance_data` WHERE `pid` = ?", [$sourcePid]);
+        $this->logMergeEvent($targetPid, 'update', "Moved the insurance_data rows of $sourcePid to $targetPid, where the target had none at that level and start");
     }
 
     /**
