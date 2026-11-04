@@ -95,10 +95,11 @@ if ($exclude_policy != "") {
             $excludePlacemakers .= ",?";
         }
     }
-    $where .= " AND i.policy_number NOT IN ($excludePlacemakers)";
+    // Twin (insurance-reference): the policy is chosen in PHP below, so its filters move there.
+    $excludedPolicies = array_slice($sqlBindArray, -count($arrayExplode));
+    $sqlBindArray = array_slice($sqlBindArray, 0, count($sqlBindArray) - count($arrayExplode));
 }
-    $where .= " AND (i.policy_number is NOT NULL AND i.policy_number != '')";
-    $where .= " GROUP BY p.pid ORDER BY c.name";
+    $where .= " GROUP BY p.pid";
     $query = sprintf("SELECT e.pc_facility,
         e.pc_eid,
         p.lname,
@@ -109,33 +110,17 @@ if ($exclude_policy != "") {
         p.sex,
         p.pid,
         p.pubpid,
-        i.subscriber_ss,
-        i.policy_number,
-        i.provider as payer_id,
-        i.subscriber_relationship,
-        i.subscriber_lname,
-        i.subscriber_fname,
-        i.subscriber_mname,
-        DATE_FORMAT(i.subscriber_dob, '%%Y%%m%%d') as subscriber_dob,
-        i.policy_number,
-        i.subscriber_sex,
-        DATE_FORMAT(i.date,'%%Y%%m%%d') as date,
         d.lname as provider_lname,
         d.fname as provider_fname,
         d.npi as provider_npi,
         d.upin as provider_pin,
         f.federal_ein as federal_ein,
         f.facility_npi as facility_npi,
-        f.name as facility_name,
-        c.cms_id as cms_id,
-        c.eligibility_id as eligibility_id,
-        c.name as payer_name
+        f.name as facility_name
         FROM openemr_postcalendar_events AS e
         LEFT JOIN users AS d on (e.pc_aid is not null and e.pc_aid = d.id)
         LEFT JOIN facility AS f on (f.id = e.pc_facility)
         LEFT JOIN patient_data AS p ON p.pid = e.pc_pid
-        LEFT JOIN insurance_data AS i ON (i.id =(SELECT id FROM insurance_data AS i WHERE pid = p.pid AND type = 'primary' ORDER BY date DESC LIMIT 1))
-        LEFT JOIN insurance_companies as c ON (c.id = i.provider)
         WHERE %s ", $where);
 
     // Run the query
@@ -147,8 +132,14 @@ if ($exclude_policy != "") {
                 $row['pc_eventDate'] = date("Ymd", strtotime((string) $tmp['pc_eventDate']));
             }
         }
+        // Twin (insurance-reference): the primary in force on the day DTP*291 sends.
+        $row = array_merge($row, EDI270::coverageColumns((int)$row['pid'], EDI270::eligibilityDay($row['pc_eventDate'] ?? null, $X12info)));
+        if (empty($row['policy_number']) || in_array($row['policy_number'], $excludedPolicies ?? [], true)) {
+            continue;
+        }
         $res[] = $row;
     }
+    usort($res, static fn(array $a, array $b): int => strcmp((string)($a['payer_name'] ?? ''), (string)($b['payer_name'] ?? '')));
     // Get the facilities information
     $facilities     = getUserFacilities($session->get('authUserID'));
 
