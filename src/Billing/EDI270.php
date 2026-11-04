@@ -24,6 +24,8 @@
 
 namespace OpenEMR\Billing;
 
+use OpenEMR\Common\Database\QueryUtils;
+
 use edih_271_codes;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\MultipartStream;
@@ -376,6 +378,53 @@ class EDI270
         echo $PATEDI;
     }
 
+    /**
+     * Twin (insurance-reference): the day a 270 asks about, the day its
+     * DTP*291 sends: the appointment date when the partner sends appointment
+     * dates ('A') and one is known, else today. For a partner that sends the
+     * subscriber's effective date ('E'), the policy is chosen on today.
+     */
+    public static function eligibilityDay(?string $appointmentYmd, mixed $X12info): \DateTimeImmutable
+    {
+        $today = \OpenEMR\Services\Insurance\CoverageDay::today();
+        if (!is_array($X12info) || ($X12info['x12_dtp03'] ?? '') !== 'A' || $appointmentYmd === null) {
+            return $today;
+        }
+        $day = \DateTimeImmutable::createFromFormat('!Ymd', $appointmentYmd);
+        return $day !== false ? $day : $today;
+    }
+
+    /**
+     * Twin (insurance-reference): the 270's policy columns for one patient: the
+     * primary in force on the day, through the coverage service. The keys are
+     * the ones the old join selected; null when no primary is in force.
+     *
+     * @return array<string, mixed>
+     */
+    public static function coverageColumns(int $pid, \DateTimeImmutable $day): array
+    {
+        $out = array_fill_keys(['subscriber_ss', 'policy_number', 'payer_id', 'subscriber_relationship', 'subscriber_lname',
+            'subscriber_fname', 'subscriber_mname', 'subscriber_dob', 'subscriber_sex', 'date', 'cms_id', 'eligibility_id',
+            'partner', 'payer_name'], null);
+        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows($pid, $day) as $i) {
+            if ($i['type'] !== 'primary') {
+                continue;
+            }
+            $c = QueryUtils::querySingleRow(
+                'SELECT cms_id, eligibility_id, x12_default_eligibility_id AS partner, name AS payer_name FROM insurance_companies WHERE id = ?',
+                [$i['provider']]
+            );
+            $ymd = static fn(mixed $d): ?string => is_string($d) && $d !== '' ? str_replace('-', '', substr($d, 0, 10)) : null;
+            $out = array_merge($out, [
+                'subscriber_ss' => $i['subscriber_ss'], 'policy_number' => $i['policy_number'], 'payer_id' => $i['provider'],
+                'subscriber_relationship' => $i['subscriber_relationship'], 'subscriber_lname' => $i['subscriber_lname'],
+                'subscriber_fname' => $i['subscriber_fname'], 'subscriber_mname' => $i['subscriber_mname'],
+                'subscriber_dob' => $ymd($i['subscriber_DOB']), 'subscriber_sex' => $i['subscriber_sex'], 'date' => $ymd($i['date']),
+            ], is_array($c) ? $c : []);
+        }
+        return $out;
+    }
+
     public static function requestEligibleTransaction($pid = 0, $eFlag = false)
     {
         $query = "SELECT
@@ -389,38 +438,22 @@ class EDI270
             p.pid,
             p.pubpid,
             p.providerID,
-            i.subscriber_ss,
-            i.policy_number,
-            i.provider as payer_id,
-            i.subscriber_relationship,
-            i.subscriber_lname,
-            i.subscriber_fname,
-            i.subscriber_mname,
-            DATE_FORMAT(i.subscriber_DOB, '%Y%m%d') as subscriber_dob,
-            i.policy_number,
-            i.subscriber_sex,
-            DATE_FORMAT(i.date, '%Y%m%d') as date,
             d.lname as provider_lname,
             d.fname as provider_fname,
             d.npi as provider_npi,
             d.upin as provider_pin,
             f.federal_ein as federal_ein,
             f.facility_npi as facility_npi,
-            f.name as facility_name,
-            c.cms_id as cms_id,
-            c.eligibility_id as eligibility_id,
-            c.x12_default_eligibility_id as partner,
-            c.name as payer_name
+            f.name as facility_name
         FROM patient_data AS p
         LEFT JOIN users AS d on (p.providerID = d.id)
         LEFT JOIN facility AS f on (f.id = d.facility_id)
-        LEFT JOIN insurance_data AS i ON (i.id =(SELECT id FROM insurance_data AS i WHERE pid = p.pid AND type = 'primary' ORDER BY date DESC LIMIT 1))
-        LEFT JOIN insurance_companies as c ON (c.id = i.provider)
         WHERE p.pid = ?";
         $res = sqlStatement($query, [$pid]);
         $resArray = [];
         while ($row = sqlFetchArray($res)) {
-            $resArray[] = $row;
+            // Twin (insurance-reference): the primary in force today (a real-time check has no appointment).
+            $resArray[] = array_merge($row, self::coverageColumns((int)$row['pid'], self::eligibilityDay(null, null)));
         }
         $details = self::requestRealTimeEligible($resArray, '', "~", ':', true);
         if ($details === false) {

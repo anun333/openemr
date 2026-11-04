@@ -275,21 +275,14 @@ class Claim
         //
         $this->payers = [];
         $this->payers[0] = [];
-        $query = "SELECT * FROM insurance_data WHERE pid = ? AND
-            (date <= ? OR date IS NULL) AND (date_end >= ? OR date_end IS NULL) ORDER BY type ASC, date DESC";
-        $dres = sqlStatement($query, [$this->pid, $encounter_date, $encounter_date]);
-        $prevtype = '';
-        while ($drow = sqlFetchArray($dres)) {
-            if (strcmp((string) $prevtype, (string) $drow['type']) == 0) {
-                continue;
-            }
-
-            $prevtype = $drow['type'];
-            // Very important to look at entries with a missing provider because
-            // they indicate no insurance as of the given date.
-            if (empty($drow['provider'])) {
-                continue;
-            }
+        // Twin (insurance-reference): the policies in force on the encounter date come from the
+        // coverage service (its rule differs from this loop's old SQL on a zero end date, two
+        // undated rows at one level, and a company that isn't a whole number).
+        $inForce = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
+            (int)$this->pid,
+            \OpenEMR\Services\Insurance\CoverageDay::forVisit($encounter_date, \OpenEMR\Services\Insurance\CoverageDay::today())
+        );
+        foreach ($inForce as $drow) {
 
             $ins = count($this->payers);
             if (
@@ -1101,9 +1094,30 @@ class Claim
 
   // Returns 'P', 'S' or 'T'.
   //
+    /**
+     * Twin (insurance-reference): DEFAULT 2 (#15038): when the only payer in force
+     * is stored as secondary, SBR01 stays its stored level ('S'), as before.
+     * X12 RFI 1980 ("there must be a primary payer") would set this to true.
+     */
+    public const SEND_SOLE_PAYER_AS_PRIMARY = false;
+
     public function payerSequence($ins = 0): string
     {
-        return strtoupper(substr(($this->payers[$ins]['data']['type'] ?? ''), 0, 1));
+        $level = strtoupper(substr(($this->payers[$ins]['data']['type'] ?? ''), 0, 1));
+        if (self::SEND_SOLE_PAYER_AS_PRIMARY && $ins === 0 && $level !== '' && !$this->hasStoredPrimaryInForce()) {
+            return 'P';
+        }
+        return $level;
+    }
+
+    private function hasStoredPrimaryInForce(): bool
+    {
+        foreach ($this->payers as $payer) {
+            if (($payer['data']['type'] ?? '') === 'primary') {
+                return true;
+            }
+        }
+        return false;
     }
 
   // Returns the HIPAA code of the patient-to-subscriber relationship.
@@ -1127,7 +1141,11 @@ class Claim
             return 'G8';
         }
 
-        return $tmp; // should not happen
+        // Twin (insurance-reference): any other value (the new-patient screen's blank
+        // choice, or a code a site adds to its sub_relation list) is G8, "Other
+        // Relationship", as the paper HCFA ticks Other and FHIR says other. Master
+        // sent the stored text raw into PAT01 and SBR02.
+        return 'G8';
     }
 
     public function insuredTypeCode($ins = 0)
