@@ -176,7 +176,9 @@ $now = time();
 $today = date('Y-m-d', $now);
 $timestamp = date('Y-m-d H:i:s', $now);
 
-$patdata = sqlQuery("SELECT " . "p.fname, p.mname, p.lname, p.postal_code, p.pubpid,p.pid, i.copay " . "FROM patient_data AS p " . "LEFT OUTER JOIN insurance_data AS i ON " . "i.pid = p.pid AND i.type = 'primary' " . "WHERE p.pid = ? ORDER BY i.date DESC LIMIT 1", [$pid
+$patdata = sqlQuery("SELECT " . "p.fname, p.mname, p.lname, p.postal_code, p.pubpid,p.pid " .
+    // Twin (insurance-reference): master joined the latest-starting primary for i.copay, which nothing here reads.
+    "FROM patient_data AS p WHERE p.pid = ?", [$pid
 ]);
 
 $alertmsg = ''; // anything here pops up in an alert box
@@ -1014,12 +1016,11 @@ if ($alertmsg === '' && (($_POST['form_save'] ?? null) || filter_input(INPUT_GET
 
                 // NumberOfInsurance
                 //
-                $ResultNumberOfInsurance = sqlStatement(
-                    "SELECT COUNT( DISTINCT TYPE ) NumberOfInsurance FROM insurance_data where pid = ? and provider>0 ",
-                    [$pid]
-                );
-                $RowNumberOfInsurance = sqlFetchArray($ResultNumberOfInsurance);
-                $NumberOfInsurance = $RowNumberOfInsurance['NumberOfInsurance'] * 1;
+                // Twin (insurance-reference): the levels in force on the visit date (master: every level ever on file).
+                $NumberOfInsurance = count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
+                    (int)$pid,
+                    \OpenEMR\Services\Insurance\CoverageDay::forVisit($dispdate, \OpenEMR\Services\Insurance\CoverageDay::today())
+                ));
                 $duept = 0;
                 if ((($NumberOfInsurance == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) { // Patient balance
                     $brow = sqlQuery("SELECT SUM(fee) AS amount FROM billing WHERE " . "pid = ? and encounter = ? AND activity = 1", [$pid, $enc

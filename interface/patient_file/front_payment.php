@@ -89,11 +89,9 @@ $today = date('Y-m-d', $now);
 $timestamp = date('Y-m-d H:i:s', $now);
 
 $patdata = sqlQuery("SELECT " .
-    "p.fname, p.mname, p.lname, p.pubpid,p.pid, i.copay " .
-    "FROM patient_data AS p " .
-    "LEFT OUTER JOIN insurance_data AS i ON " .
-    "i.pid = p.pid AND i.type = 'primary' " .
-    "WHERE p.pid = ? ORDER BY i.date DESC LIMIT 1", [$pid]);
+    "p.fname, p.mname, p.lname, p.pubpid,p.pid " .
+    // Twin (insurance-reference): master joined the latest-starting primary for i.copay, which nothing here reads.
+    "FROM patient_data AS p WHERE p.pid = ?", [$pid]);
 
 $invoice_refno = BillingUtilities::updateInvoiceRefNumber();
 
@@ -1347,10 +1345,12 @@ function make_insurance() {
 
                                     //------------------------------------------------------------------------------------
                                     //NumberOfInsurance
-                                    $ResultNumberOfInsurance = sqlStatement("SELECT COUNT( DISTINCT TYPE ) NumberOfInsurance FROM `insurance_data`
-                                    where pid = ? and provider>0 ", [$pid]);
-                                    $RowNumberOfInsurance = sqlFetchArray($ResultNumberOfInsurance);
-                                    $NumberOfInsurance = $RowNumberOfInsurance['NumberOfInsurance'] * 1;
+                                    // Twin (insurance-reference): the levels in force on the visit date, as
+                                    // get_patient_balance() counts them (master: every level ever on file).
+                                    $NumberOfInsurance = count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
+                                        (int)$pid,
+                                        \OpenEMR\Services\Insurance\CoverageDay::forVisit($dispdate, \OpenEMR\Services\Insurance\CoverageDay::today())
+                                    ));
                                     //------------------------------------------------------------------------------------
                                     $duept = 0;
                                     if ((($NumberOfInsurance == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) {//Patient balance
