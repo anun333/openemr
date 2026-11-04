@@ -108,6 +108,64 @@ final class EffectiveInsuranceRule
     }
 
     /**
+     * Each policy's time at the head of one level: the days on which choose()
+     * returns it there, as runs of consecutive days. A run's from is null when
+     * it reaches back to always (a blank start), its to null when it is open.
+     * Computed by asking choose() itself at every day the answer can change
+     * (each start, and the day after each end), so it can't disagree with it.
+     *
+     * Twin (insurance-reference): for readers that report over a period, such as
+     * eCQM's payer, which QDM gives a start and a stop.
+     *
+     * @param list<array<mixed>> $rows one patient's insurance_data rows, as for choose()
+     * @return list<CoverageSegment> oldest first
+     */
+    public static function segments(array $rows, InsuranceLevel $level): array
+    {
+        $points = [];
+        foreach ($rows as $row) {
+            $type = $row['type'] ?? null;
+            if (!is_string($type) || InsuranceLevel::tryFrom($type) !== $level) {
+                continue;
+            }
+            $start = self::calendarDay(self::storedDate($row['date'] ?? null));
+            if ($start !== null) {
+                $points[$start->format('Y-m-d')] = $start;
+            }
+            $end = self::calendarDay(self::storedDate($row['date_end'] ?? null));
+            if ($end !== null) {
+                $after = $end->modify('+1 day');
+                $points[$after->format('Y-m-d')] = $after;
+            }
+        }
+        ksort($points);
+        $points = array_values($points);
+        // The days to ask: one before the first change (what held "always"), then each change.
+        $asks = $points === [] ? [new DateTimeImmutable('today')] : [$points[0]->modify('-1 day'), ...$points];
+        $segments = [];
+        foreach ($asks as $i => $day) {
+            $held = null;
+            foreach (self::choose($rows, $day) as $policy) {
+                if ($policy->level === $level) {
+                    $held = $policy;
+                }
+            }
+            if ($held === null) {
+                continue;
+            }
+            $from = $i === 0 ? null : $day;
+            $to = $i === 0 ? ($points === [] ? null : $points[0]->modify('-1 day')) : (isset($asks[$i + 1]) ? $asks[$i + 1]->modify('-1 day') : null);
+            $last = $segments === [] ? null : $segments[count($segments) - 1];
+            if ($last !== null && $last->policy->id === $held->id && $last->to !== null && $from !== null && $last->to->modify('+1 day') == $from) {
+                $segments[count($segments) - 1] = new CoverageSegment($held, $last->from, $to);
+                continue;
+            }
+            $segments[] = new CoverageSegment($held, $from, $to);
+        }
+        return $segments;
+    }
+
+    /**
      * Whether a policy outranks the one held for its level: the later start,
      * then the higher id.
      */

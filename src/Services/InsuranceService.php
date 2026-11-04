@@ -24,7 +24,10 @@ use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Events\Services\ServiceSaveEvent;
 use OpenEMR\Services\Insurance\EffectiveInsurance;
+use OpenEMR\Services\Insurance\CoverageDay;
+use OpenEMR\Services\Insurance\CoverageSegment;
 use OpenEMR\Services\Insurance\EffectiveInsuranceRule;
+use OpenEMR\Services\Insurance\InsuranceLevel;
 use OpenEMR\Services\Search\{
     CompositeSearchField,
     DateSearchField,
@@ -102,10 +105,12 @@ class InsuranceService extends BaseService
 
         $whereClause = FhirSearchWhereClauseBuilder::build($search, $isAndCondition);
 
+        // Twin (insurance-reference): the policy in force today first, as the coverage
+        // service decides it (both ends inclusive, a blank or zero end open), then the
+        // latest start. Master put any open or future end first, so next year's card
+        // led the list the policy editor and the demographics card open on.
         $orderClause = " ORDER BY `patient_data_pid` ASC,`type` ASC"
-            // sort by 1 first then 0
-        . ", (`date_end` is null or `date_end` > NOW()) DESC"
-        . ", (`date_end` IS NOT NULL AND `date_end` > NOW()) DESC"
+        . ", ((`date` IS NULL OR `date` <= CURDATE()) AND (`date_end` IS NULL OR `date_end` = '0000-00-00' OR `date_end` >= CURDATE())) DESC"
         . ", `date` DESC, `date_end` DESC, `policy_number` ASC";
 
         $sql .= $whereClause->getFragment() . $orderClause;
@@ -484,9 +489,22 @@ class InsuranceService extends BaseService
             }
             $result[$insurancePolicy['type']][] = $insurancePolicy;
         }
+        // Twin (insurance-reference): "current" is the policy the coverage service
+        // has in force today at its level; the others keep search()'s order. A
+        // level with nothing in force keeps search()'s first row, as before.
+        $inForce = [];
+        foreach ($this->getEffectiveInsurances((int)$pid, CoverageDay::today()) as $policy) {
+            $inForce[$policy->level->value] = $policy->id;
+        }
         $organizedResults = [];
         foreach ($result as $key => $policies) {
             if (count($policies) > 0) {
+                foreach ($policies as $i => $policy) {
+                    if (isset($inForce[$key]) && (int)($policy['id'] ?? 0) === $inForce[$key]) {
+                        array_unshift($policies, ...array_splice($policies, $i, 1));
+                        break;
+                    }
+                }
                 reset($policies);
                 $current = current($policies);
                 $history = array_splice($policies, 1);
@@ -521,6 +539,98 @@ class InsuranceService extends BaseService
             [$pid]
         );
         return EffectiveInsuranceRule::choose($rows, $day);
+    }
+
+    /**
+     * The insurance_data rows (every column) of the policies in force on a
+     * day, in getEffectiveInsurances()'s order: for callers that send the
+     * subscriber, the policy number or the copay (lab IN1, the claim, the 270).
+     *
+     * Twin (insurance-reference): the narrow value object isn't enough for
+     * most callers, so they read the row by id; this does it once.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getEffectiveInsuranceRows(int $pid, DateTimeImmutable $day): array
+    {
+        $ids = array_map(static fn(EffectiveInsurance $p): int => $p->id, $this->getEffectiveInsurances($pid, $day));
+        if ($ids === []) {
+            return [];
+        }
+        $byId = [];
+        foreach (
+            QueryUtils::fetchRecords(
+                'SELECT * FROM `insurance_data` WHERE `id` IN (' . implode(',', array_fill(0, count($ids), '?')) . ')',
+                $ids
+            ) as $row
+        ) {
+            $id = $row['id'] ?? null;
+            if (is_int($id)) {
+                $byId[$id] = $row;
+            }
+        }
+        $rows = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id])) {
+                $rows[] = $byId[$id];
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * The rule's input rows (id, uuid, pid, type, provider, date, date_end)
+     * for many patients, by pid, for reports that ask about a different day
+     * per patient: pass each patient's rows to EffectiveInsuranceRule::choose().
+     * One query per 1000 patients.
+     *
+     * @param list<int> $pids
+     * @return array<int, list<array<string, mixed>>>
+     */
+    public function getRuleRowsByPid(array $pids): array
+    {
+        $byPid = [];
+        foreach (array_chunk(array_values(array_unique($pids)), 1000) as $chunk) {
+            foreach (
+                QueryUtils::fetchRecords(
+                    'SELECT `id`, `uuid`, `pid`, `type`, `provider`, `date`, `date_end` FROM `insurance_data` WHERE `pid` IN ('
+                        . implode(',', array_fill(0, count($chunk), '?')) . ')',
+                    $chunk
+                ) as $row
+            ) {
+                $pid = $row['pid'] ?? null;
+                if (is_int($pid)) {
+                    $byPid[$pid][] = $row;
+                }
+            }
+        }
+        return $byPid;
+    }
+
+    /**
+     * Each policy's days at the head of a level, oldest first
+     * (EffectiveInsuranceRule::segments()).
+     *
+     * @return list<CoverageSegment>
+     */
+    public function getCoverageSegments(int $pid, InsuranceLevel $level): array
+    {
+        return EffectiveInsuranceRule::segments($this->getRuleRowsByPid([$pid])[$pid] ?? [], $level);
+    }
+
+    /**
+     * The copay of the primary policy in force on a day, as stored ('' when
+     * none is in force). The fee sheet's COPAY line charges it.
+     */
+    public function getPrimaryCopayOn(int $pid, DateTimeImmutable $day): string
+    {
+        foreach ($this->getEffectiveInsuranceRows($pid, $day) as $row) {
+            if (($row['type'] ?? null) === InsuranceLevel::Primary->value) {
+                $copay = $row['copay'] ?? '';
+                return is_string($copay) ? $copay : '';
+            }
+        }
+        return '';
     }
 
     public function swapInsurance($pid, string $targetType, string $insuranceUuid): ProcessingResult
