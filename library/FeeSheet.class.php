@@ -103,9 +103,6 @@ class FeeSheet
 
         $this->pid = $pid;
         $this->encounter = $encounter;
-        // get provider field for pid's primary insurance from insurance_data to be added to billing row table as payer_id
-        $primary_insurance = getInsuranceData($this->pid);
-        $this->payer_id = $primary_insurance['provider'] ?? null;
 
         // IPPF doesn't want any payments to be made or displayed in the Fee Sheet.
         $this->ALLOW_COPAYS = empty(OEGlobalsBag::getInstance()->get('ippf_specific'));
@@ -127,6 +124,14 @@ class FeeSheet
           "LEFT JOIN facility AS fac ON fac.id = fe.facility_id " .
           "WHERE fe.pid = ? AND fe.encounter = ? LIMIT 1", [$this->pid, $this->encounter]);
         $this->visit_date    = substr((string) $visit_row['date'], 0, 10);
+        // Twin (insurance-reference): billing.payer_id is the primary in force on the visit
+        // date (master: getInsuranceData(), the latest-starting primary, ended or not).
+        $this->payer_id = null;
+        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances((int)$this->pid, \OpenEMR\Services\Insurance\CoverageDay::forVisit($this->visit_date, \OpenEMR\Services\Insurance\CoverageDay::today())) as $policy) {
+            if ($policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary) {
+                $this->payer_id = $policy->companyId;
+            }
+        }
         $this->provider_id   = $visit_row['provider_id'];
         if (empty($this->provider_id)) {
             $this->provider_id = $this->findProvider();
