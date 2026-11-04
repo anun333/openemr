@@ -654,12 +654,16 @@ if (!empty($_POST['form_refresh'])) {
             if ($form_report_by == '1') {
                 if (empty($row['payer_id'])) {
                     // 'ar_session' is not capturing payer_id when entering payments through invoice or era posting
-                    if ($row['payer_type'] == '1') {
-                        $insurance_id = (new InsuranceService())->getOneByPid($row['pid'], "primary");
-                    } elseif ($row['payer_type'] == '2') {
-                        $insurance_id = (new InsuranceService())->getOneByPid($row['pid'], "secondary");
-                    } elseif ($row['payer_type'] == '3') {
-                        $insurance_id = (new InsuranceService())->getOneByPid($row['pid'], "tertiary");
+                    // Twin (insurance-reference): the policy at that level in force on the date of
+                    // service (master: getOneByPid(), key order: an undated row, else the oldest).
+                    $insurance_id = [];
+                    $levelOfPayer = [1 => 'primary', 2 => 'secondary', 3 => 'tertiary'][(int)$row['payer_type']] ?? null;
+                    if ($levelOfPayer !== null) {
+                        foreach ((new InsuranceService())->getEffectiveInsurances((int)$row['pid'], \OpenEMR\Services\Insurance\CoverageDay::forVisit($row['date'], \OpenEMR\Services\Insurance\CoverageDay::today())) as $policyInForce) {
+                            if ($policyInForce->level->value === $levelOfPayer) {
+                                $insurance_id = ['provider' => $policyInForce->companyId];
+                            }
+                        }
                     } elseif ($row['payer_type'] == '0') {
                         $rowmethod = xl('Personal pay');
                         $rowreference = trim((string) $row['reference']);
