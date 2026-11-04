@@ -312,7 +312,7 @@ class CoverageValidator extends BaseValidator
                                 $srcTypeCanReceiveTarget = QueryUtils::fetchSingleValue(
                                     "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date IS NOT NULL AND date = ?",
                                     'cnt',
-                                    [$values['pid'], $srcData['type'], $targetDate]
+                                    [$values['pid'], $srcData[0]['type'], $targetDate] // Twin (insurance-reference): master read ['type'] off the list, binding NULL
                                 );
                                 if ($srcTypeCanReceiveTarget > 0) {
                                     throw new InvalidValueException("Source coverage type already has a policy with an effective date that conflicts with the target policy effective date", "Record::INVALID_SOURCE_POLICY_DATE");
