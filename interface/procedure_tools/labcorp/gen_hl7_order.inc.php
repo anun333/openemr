@@ -40,6 +40,8 @@ use OpenEMR\Common\Logging\EventAuditLogger;
 use OpenEMR\Common\Orders\Hl7OrderGenerationException;
 use OpenEMR\Common\Orders\Hl7OrderResult;
 use OpenEMR\Common\Session\SessionWrapperFactory;
+use OpenEMR\Services\Insurance\CoverageDay;
+use OpenEMR\Services\InsuranceService;
 
 function hl7Race($s)
 {
@@ -87,26 +89,11 @@ function hl7Workman($s): string
  */
 function labcorp_loadPayerInfo($pid, $date = ''): array
 {
-    if (empty($date)) {
-        $date = date('Y-m-d');
-    }
+    // Twin (insurance-reference): the coverage service's policies in force on
+    // the day, so an ended plan is not billed and an undated one is.
+    $day = CoverageDay::forVisit($date, CoverageDay::today());
     $payers = [];
-    $dres = sqlStatement(
-        "SELECT * FROM insurance_data WHERE " .
-        "pid = ? AND date <= ? ORDER BY type ASC, date DESC",
-        [$pid, $date]
-    );
-    $prevtype = ''; // type is primary, secondary or tertiary
-    while ($drow = sqlFetchArray($dres)) {
-        if (strcmp((string) $prevtype, (string) $drow['type']) == 0) {
-            continue;
-        }
-        $prevtype = $drow['type'];
-        // Very important to check for a missing provider because
-        // that indicates no insurance as of the given date.
-        if (empty($drow['provider'])) {
-            continue;
-        }
+    foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $drow) {
         $ins = count($payers);
         $crow = sqlQuery(
             "SELECT * FROM insurance_companies WHERE id = ?",
@@ -123,21 +110,13 @@ function labcorp_loadPayerInfo($pid, $date = ''): array
 
 function loadGuarantorInfo($pid, $date = ''): array
 {
-    if (empty($date)) {
-        $date = date('Y-m-d');
-    }
+    // Twin (insurance-reference): the first policy in force on the day (the
+    // primary when there is one), where master took the latest-starting row
+    // of the first level, ended or not.
+    $day = CoverageDay::forVisit($date, CoverageDay::today());
     $guarantors = [];
-    $gres = sqlStatement(
-        "SELECT * FROM insurance_data WHERE " .
-        "pid = ? AND date <= ? ORDER BY type ASC, date DESC LIMIT 1",
-        [$pid, $date]
-    );
-    $prevtype = ''; // type is primary, secondary or tertiary
-    while ($drow = sqlFetchArray($gres)) {
-        $gnt = count($guarantors);
-
-        $guarantors[$gnt] = [];
-        $guarantors[$gnt]['data'] = $drow;
+    foreach (array_slice((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day), 0, 1) as $drow) {
+        $guarantors[] = ['data' => $drow];
     }
     return $guarantors;
 }
@@ -346,7 +325,8 @@ function labcorp_gen_hl7_order(int $orderid): Hl7OrderResult
     $P[30] = hl7Text($porow['docnpi']);
     $P[71] = hl7Text($porow['docnpi']);
         // Insurance stuff.
-    $payers = labcorp_loadPayerInfo($porow['pid'], $porow['date_ordered']);
+    $labDay = CoverageDay::forLabOrder($porow['date_collected'], $porow['date_ordered'], CoverageDay::today())->format('Y-m-d');
+    $payers = labcorp_loadPayerInfo($porow['pid'], $labDay);
     $setid = 0;
     if ($bill_type == 'T') {
         // only send primary and secondary insurance
@@ -426,7 +406,7 @@ function labcorp_gen_hl7_order(int $orderid): Hl7OrderResult
         $out .= "IN1|$setid||||||||||||||||||||||||||||||||||||||||||||||$bill_type" . $d0;
     }
 
-    $guarantors = loadGuarantorInfo($porow['pid'], $porow['date_ordered']);
+    $guarantors = loadGuarantorInfo($porow['pid'], $labDay);
     foreach ($guarantors as $guarantor) {
         if (hl7Text($bill_type) != "C") {
             if ($guarantor['data']['subscriber_lname'] != "") {

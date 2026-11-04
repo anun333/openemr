@@ -201,7 +201,8 @@ function quest_gen_hl7_order(int $orderid): Hl7OrderResult
 
   // Insurance stuff.
     $ins_type = trim((string) $porow['billing_type']);
-    $payers = quest_loadPayerInfo($porow['pid'], $porow['date_ordered']);
+    // Twin (insurance-reference): DEFAULT 1 (#15038), the collection date, else the order date.
+    $payers = quest_loadPayerInfo($porow['pid'], \OpenEMR\Services\Insurance\CoverageDay::forLabOrder($porow['date_collected'] ?? null, $porow['date_ordered'], \OpenEMR\Services\Insurance\CoverageDay::today())->format('Y-m-d'));
     $setid = 0;
     if ($ins_type == 'T') {
         // only send primary and secondary insurance
