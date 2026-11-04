@@ -41,7 +41,7 @@ use OpenEMR\Common\Session\SessionWrapperFactory;
  *
  * @param int $pid Patient ID.
  * @param  date    $encounter_date  YYYY-MM-DD date.
- * @return array   Array containing an array of data for each payer.
+ * @return array<int, array<mixed>> Each payer's data, company and object, keyed by its level (0 primary, 1 secondary, 2 tertiary).
  */
 function default_loadPayerInfo($pid, $date = ''): array
 {
@@ -49,7 +49,13 @@ function default_loadPayerInfo($pid, $date = ''): array
         $date = date('Y-m-d');
     }
 
-    $payers = getEffectiveInsurances($pid, $date);
+    // Twin (insurance-reference): the coverage service's policies in force on the day, keyed by level,
+    // so a current secondary behind an ended primary still goes out as the secondary (IN1-22).
+    $day = \OpenEMR\Services\Insurance\CoverageDay::fromStored($date);
+    $payers = [];
+    foreach ($day === null ? [] : (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
+        $payers[$effective->policy->level->number() - 1] = $effective->columns;
+    }
 
     foreach ($payers as $key => $drow) {
         // Very important to check for a missing provider because
@@ -201,9 +207,10 @@ function default_gen_hl7_order(int $orderid): Hl7OrderResult
     $d0;
 
   // Insurance stuff.
-    $payers = default_loadPayerInfo($porow['pid'], $porow['date_ordered']);
+    // Twin (insurance-reference): DEFAULT 1 (#15038), the collection date, else the order date.
+    $payers = default_loadPayerInfo($porow['pid'], \OpenEMR\Services\Insurance\CoverageDay::forLabOrder($porow['date_collected'] ?? null, $porow['date_ordered'], \OpenEMR\Services\Insurance\CoverageDay::today())->format('Y-m-d'));
     $setid = 0;
-    foreach ($payers as $payer) {
+    foreach ($payers as $level => $payer) {
         $payer_object = $payer['object'];
         $payer_address = $payer_object->get_address();
         $out .= "IN1" .
@@ -232,7 +239,7 @@ function default_gen_hl7_order(int $orderid): Hl7OrderResult
         $d2 . hl7Zip($payer['data']['subscriber_postal_code']) . // Zip
         $d1 .
         $d1 .
-        $d1 . $setid .                                  // 1=Primary, 2=Secondary, 3=Tertiary
+        $d1 . ($level + 1) .                           // 1=Primary, 2=Secondary, 3=Tertiary: the payer's level
         str_repeat($d1, 13) .                           // IN1-23 to 35 all empty
         $d1 . hl7Text($payer['data']['policy_number']) . // Policy Number
         str_repeat($d1, 12) .                           // IN1-37 to 48 all empty
