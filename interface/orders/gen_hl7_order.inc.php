@@ -201,7 +201,8 @@ function default_gen_hl7_order(int $orderid): Hl7OrderResult
     $d0;
 
   // Insurance stuff.
-    $payers = default_loadPayerInfo($porow['pid'], $porow['date_ordered']);
+    // Twin (insurance-reference): DEFAULT 1 (#15038), the collection date, else the order date.
+    $payers = default_loadPayerInfo($porow['pid'], \OpenEMR\Services\Insurance\CoverageDay::forLabOrder($porow['date_collected'] ?? null, $porow['date_ordered'], \OpenEMR\Services\Insurance\CoverageDay::today())->format('Y-m-d'));
     $setid = 0;
     foreach ($payers as $payer) {
         $payer_object = $payer['object'];
