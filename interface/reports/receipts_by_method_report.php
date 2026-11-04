@@ -657,13 +657,12 @@ if (!empty($_POST['form_refresh'])) {
                     // Twin (insurance-reference): the policy at that level in force on the date of
                     // service (master: getOneByPid(), key order: an undated row, else the oldest).
                     $insurance_id = [];
-                    $levelOfPayer = [1 => 'primary', 2 => 'secondary', 3 => 'tertiary'][(int)$row['payer_type']] ?? null;
-                    if ($levelOfPayer !== null) {
-                        foreach ((new InsuranceService())->getEffectiveInsurances((int)$row['pid'], \OpenEMR\Services\Insurance\CoverageDay::forVisit($row['date'], \OpenEMR\Services\Insurance\CoverageDay::today())) as $policyInForce) {
-                            if ($policyInForce->level->value === $levelOfPayer) {
-                                $insurance_id = ['provider' => $policyInForce->companyId];
-                            }
-                        }
+                    if (in_array((int)$row['payer_type'], [1, 2, 3], true)) {
+                        $insurance_id = ['provider' => (new InsuranceService())->getCompanyAtLevelOn(
+                            (int)$row['pid'],
+                            (int)$row['payer_type'],
+                            \OpenEMR\Services\Insurance\CoverageDay::forVisit($row['date'], \OpenEMR\Services\Insurance\CoverageDay::today())
+                        )];
                     } elseif ($row['payer_type'] == '0') {
                         $rowmethod = xl('Personal pay');
                         $rowreference = trim((string) $row['reference']);
