@@ -23,6 +23,7 @@ use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Events\Services\ServiceSaveEvent;
+use OpenEMR\Services\Insurance\CoverageSegment;
 use OpenEMR\Services\Insurance\EffectiveInsurance;
 use OpenEMR\Services\Insurance\EffectiveInsuranceRow;
 use OpenEMR\Services\Insurance\EffectiveInsuranceRule;
@@ -552,6 +553,42 @@ class InsuranceService extends BaseService
             $companyIds
         );
         return EffectiveInsuranceRow::forPolicies($policies, $rows, $companies);
+    }
+
+    /**
+     * Many patients' insurance_data rows, by pid, as EffectiveInsuranceRule
+     * reads them (id, uuid, pid, type, provider, date, date_end): for reports
+     * and the eCQM run, which read once and then ask the rule about each
+     * patient's own days (EffectiveInsuranceRule::choose()) or period
+     * (EffectiveInsuranceRule::segments()). One query per 1000 patients. A
+     * patient with no rows has no key.
+     *
+     * @param list<int> $pids
+     * @return array<int, list<array<mixed>>>
+     */
+    public function getRuleRowsByPid(array $pids): array
+    {
+        $rows = [];
+        foreach (array_chunk(array_values(array_unique($pids)), 1000) as $chunk) {
+            $rows = array_merge($rows, QueryUtils::fetchRecords(
+                "SELECT `id`, `uuid`, `pid`, `type`, `provider`, `date`, `date_end` FROM `insurance_data` WHERE `pid` IN ("
+                    . implode(',', array_fill(0, count($chunk), '?')) . ")",
+                $chunk
+            ));
+        }
+        return EffectiveInsuranceRule::rowsByPid($rows);
+    }
+
+    /**
+     * The runs of days within a range on which each policy heads a level
+     * (EffectiveInsuranceRule::segments()), oldest first: for readers that
+     * report over a period, such as eCQM's payer over the measurement period.
+     *
+     * @return list<CoverageSegment>
+     */
+    public function getCoverageSegments(int $pid, InsuranceLevel $level, DateTimeImmutable $from, DateTimeImmutable $to): array
+    {
+        return EffectiveInsuranceRule::segments($this->getRuleRowsByPid([$pid])[$pid] ?? [], $level, $from, $to);
     }
 
     public function swapInsurance($pid, string $targetType, string $insuranceUuid): ProcessingResult

@@ -10,6 +10,7 @@
 
 namespace OpenEMR\Services\Qdm\Services;
 
+use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Cqm\Qdm\BaseTypes\Address;
 use OpenEMR\Cqm\Qdm\BaseTypes\Code;
 use OpenEMR\Cqm\Qdm\BaseTypes\DateTime;
@@ -54,17 +55,25 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
                     P.phone_cell,
                     P.country_code,
                     P.deceased_date,
-                    P.deceased_reason,
-                    INS.date AS payer_eff_date,
-                    INSCO.cqm_sop AS payer_code
+                    P.deceased_reason
             FROM patient_data P
             LEFT JOIN list_options RACE ON RACE.list_id = 'race' AND P.race = RACE.option_id
             LEFT JOIN list_options ETHN ON ETHN.list_id = 'ethnicity' AND P.ethnicity = ETHN.option_id
             LEFT JOIN list_options SEX ON SEX.list_id = 'sex' AND P.sex = SEX.option_id
-            LEFT JOIN insurance_data INS ON P.pid = INS.pid AND INS.type = 'primary'
-            LEFT JOIN insurance_companies INSCO ON INS.provider = INSCO.id
             ";
         return $sql;
+    }
+
+    /** @var array<int, ?string> the Source of Payment Typology code by company id */
+    private static array $payerCodes = [];
+
+    private static function payerCode(int $companyId): ?string
+    {
+        if (!array_key_exists($companyId, self::$payerCodes)) {
+            $sop = QueryUtils::fetchSingleValue('SELECT cqm_sop FROM insurance_companies WHERE id = ?', 'cqm_sop', [$companyId]);
+            self::$payerCodes[$companyId] = is_scalar($sop) && (string)$sop !== '' ? (string)$sop : null;
+        }
+        return self::$payerCodes[$companyId];
     }
 
     public static function makeQdmIdentifier($namingSystem, $value): Identifier
@@ -159,25 +168,39 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
             $qdmPatient->add_data_element($pcexp);
         }
 
-        $payer = new PatientCharacteristicPayer([
-            'relevantPeriod' => new Interval([
-                'low' => new DateTime([
-                    'date' => $record['payer_eff_date']
+        // Twin (insurance-reference): one payer per run of days a primary policy heads its level
+        // (DEFAULT 4, #15038: every primary, each with its own start and stop; the CQL keeps those that
+        // overlap the measurement period). Master joined every primary row and kept the last fetched,
+        // with no stop. A patient with no primary keeps master's single payer with no code.
+        $segments = (new \OpenEMR\Services\InsuranceService())->getCoverageSegments((int)$record['pid'], \OpenEMR\Services\Insurance\InsuranceLevel::Primary);
+        $periods = [];
+        foreach ($segments as $segment) {
+            $periods[] = [$segment->from?->format('Y-m-d'), $segment->to?->format('Y-m-d'), self::payerCode($segment->policy->companyId)];
+        }
+        if ($periods === []) {
+            $periods[] = [null, null, null];
+        }
+        foreach ($periods as [$low, $high, $code]) {
+            $payer = new PatientCharacteristicPayer([
+                'relevantPeriod' => new Interval([
+                    'low' => new DateTime([
+                        'date' => $low
+                    ]),
+                    'high' => $high === null ? null : new DateTime(['date' => $high]),
+                    'lowClosed' => $low !== null,
+                    'highClosed' => $high !== null
                 ]),
-                'high' => null, // TODO We don't have an end-date for insurance?,
-                'lowClosed' => (bool) $record['payer_eff_date'],
-                'highClosed' => false
-            ]),
-            'dataElementCodes' => [
-                new Code(
-                    [
-                        'code' => $record['payer_code'],
-                        'system' => '2.16.840.1.113883.3.221.5'
-                    ]
-                )
-            ]
-        ]);
-        $qdmPatient->add_data_element($payer);
+                'dataElementCodes' => [
+                    new Code(
+                        [
+                            'code' => $code,
+                            'system' => '2.16.840.1.113883.3.221.5'
+                        ]
+                    )
+                ]
+            ]);
+            $qdmPatient->add_data_element($payer);
+        }
 
         // Reference: https://phinvads.cdc.gov/vads/ViewCodeSystem.action?id=2.16.840.1.113883.6.238
         $pcr = new PatientCharacteristicRace(

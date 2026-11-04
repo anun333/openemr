@@ -181,9 +181,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertSame($expected, self::chosen(array_reverse($rows)), 'the order rows arrive in decides nothing');
     }
 
-    /**
-     * Levels are independent: the secondary comes back alone after the primary ends.
-     */
     #[Test]
     public function anEndedPrimaryDoesNotHideACurrentSecondary(): void
     {
@@ -195,9 +192,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertSame(['secondary #2 company 104'], self::chosen($rows));
     }
 
-    /**
-     * An "Unassigned" primary empties its own level, not the levels after it.
-     */
     #[Test]
     public function aPrimaryWithNoCompanyDoesNotHideACurrentSecondary(): void
     {
@@ -209,9 +203,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertSame(['secondary #2 company 104'], self::chosen($rows));
     }
 
-    /**
-     * Primary, secondary, tertiary whatever order the rows arrive in; an ended secondary leaves a gap, nothing moves up.
-     */
     #[Test]
     public function levelsComeBackInStoredOrderWithGapsKept(): void
     {
@@ -224,9 +215,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertSame(['primary #1 company 101', 'tertiary #3 company 103'], self::chosen($rows));
     }
 
-    /**
-     * A type that isn't exactly primary, secondary or tertiary (null, blank, "Primary") belongs to no level.
-     */
     #[Test]
     public function rowsWithNoLevelAreIgnored(): void
     {
@@ -239,9 +227,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertSame([], self::chosen($rows));
     }
 
-    /**
-     * A year with another insurer between two spells of the first: each day gets the policy in force on it.
-     */
     #[Test]
     public function aChangeOfInsurerAndBackFollowsTheDay(): void
     {
@@ -257,9 +242,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertSame(['primary #3 company 101'], self::chosen($rows, '2026-01-01'));
     }
 
-    /**
-     * Ids and companies as a read may return them: ints, digit strings, leading zeros, surrounding spaces.
-     */
     #[Test]
     public function idsAndCompaniesAreReadAsTheyArrive(): void
     {
@@ -276,9 +258,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertSame(['primary #4 company 104'], self::chosen([self::row(4, 'primary', ' 104 ', null, null)]));
     }
 
-    /**
-     * The day asked about is the date's own calendar day: its time is dropped and its zone isn't converted.
-     */
     #[Test]
     public function theDayIsTheCalendarDayGivenWhateverItsTimeOrZone(): void
     {
@@ -292,10 +271,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertCount(1, EffectiveInsuranceRule::choose($rows, $earlyEastOfUtc));
     }
 
-    /**
-     * A policy carries its row id, its uuid as text (null when the bytes aren't one), its company and dates;
-     * a zero end reads as open.
-     */
     #[Test]
     public function aPolicyCarriesItsRowIdUuidCompanyAndDates(): void
     {
@@ -340,10 +315,6 @@ final class EffectiveInsuranceRuleTest extends TestCase
         ];
     }
 
-    /**
-     * A partial date is compared as stored, and the start and end reported are the first and last days that
-     * comparison keeps.
-     */
     #[Test]
     #[DataProvider('partialDates')]
     public function aPartialDateIsReportedAsTheDaysTheRuleKeeps(string $start, ?string $end, string $day, ?string $first, ?string $last): void
@@ -355,11 +326,14 @@ final class EffectiveInsuranceRuleTest extends TestCase
         self::assertCount(1, $policies, 'in force on ' . $day);
         self::assertSame($first, $policies[0]->start?->format('Y-m-d'), 'the first day in force');
         self::assertSame($last, $policies[0]->end?->format('Y-m-d'), 'the last day in force');
+
+        // The same days segments() finds over a range that holds them all.
+        $segments = EffectiveInsuranceRule::segments($rows, InsuranceLevel::Primary, new DateTimeImmutable('2019-01-01'), new DateTimeImmutable('2030-12-31'));
+        self::assertCount(1, $segments);
+        self::assertSame($first ?? '2019-01-01', $segments[0]->from->format('Y-m-d'));
+        self::assertSame($last ?? '2030-12-31', $segments[0]->to->format('Y-m-d'));
     }
 
-    /**
-     * No rows give an empty list, not an error.
-     */
     #[Test]
     public function aPatientWithNoRowsHasNoCoverage(): void
     {
