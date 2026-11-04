@@ -619,6 +619,22 @@ class InsuranceService extends BaseService
     }
 
     /**
+     * The company of the policy at a level (1 primary, 2 secondary, 3 tertiary)
+     * in force on a day, or null. Receipts by Payer names an insurer payment
+     * posted without a payer with it.
+     */
+    public function getCompanyAtLevelOn(int $pid, int $levelNumber, DateTimeImmutable $day): ?int
+    {
+        $level = [1 => InsuranceLevel::Primary, 2 => InsuranceLevel::Secondary, 3 => InsuranceLevel::Tertiary][$levelNumber] ?? null;
+        foreach ($this->getEffectiveInsurances($pid, $day) as $policy) {
+            if ($policy->level === $level) {
+                return $policy->companyId;
+            }
+        }
+        return null;
+    }
+
+    /**
      * The copay of the primary policy in force on a day, as stored ('' when
      * none is in force). The fee sheet's COPAY line charges it.
      */
