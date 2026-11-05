@@ -1016,20 +1016,21 @@ if ($alertmsg === '' && (($_POST['form_save'] ?? null) || filter_input(INPUT_GET
 
                 // NumberOfInsurance
                 //
-                // Twin (insurance-reference): the highest level in force on the visit date, compared below with the
-                // last level closed (master: the number of levels ever on file). With no level in force the balance
-                // is the patient's; a gap (an ended primary, a current secondary) can't make an open level look closed.
-                $NumberOfInsurance = 0;
-                foreach (
-                    (new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
-                        is_numeric($pid) ? (int)$pid : 0,
-                        (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($dispdate) ? $dispdate : null)
-                    ) as $policyInForce
-                ) {
-                    $NumberOfInsurance = ['primary' => 1, 'secondary' => 2, 'tertiary' => 3][$policyInForce->level->value];
-                }
+                $NumberOfInsurance = \OpenEMR\Common\Database\QueryUtils::fetchSingleValue(
+                    "SELECT COUNT( DISTINCT TYPE ) NumberOfInsurance FROM insurance_data where pid = ? and provider>0 ",
+                    'NumberOfInsurance',
+                    [$pid]
+                );
+                $NumberOfInsurance = is_numeric($NumberOfInsurance) ? (int)$NumberOfInsurance : 0;
+                // Twin (insurance-reference): rule 10. With no insurance level in force on the visit date the balance is
+                // the patient's (master: only with none ever on file). The rest of master's test is kept: the number of
+                // levels on file compared with the last level closed.
+                $levelsInForce = count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
+                    is_numeric($pid) ? (int)$pid : 0,
+                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($dispdate) ? $dispdate : null)
+                ));
                 $duept = 0;
-                if ((($NumberOfInsurance == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) { // Patient balance
+                if ((($levelsInForce == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) { // Patient balance
                     $brow = sqlQuery("SELECT SUM(fee) AS amount FROM billing WHERE " . "pid = ? and encounter = ? AND activity = 1", [$pid, $enc
                     ]);
                     $srow = sqlQuery("SELECT SUM(fee) AS amount FROM drug_sales WHERE " . "pid = ? and encounter = ? ", [$pid, $enc
