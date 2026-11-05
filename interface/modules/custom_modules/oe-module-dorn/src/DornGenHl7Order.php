@@ -81,7 +81,10 @@ class DornGenHl7Order extends GenHl7OrderBase
 
         // Insurance stuff.
         // Twin (insurance-reference): DEFAULT 1 (#15038), the collection date, else the order date.
-        $labDay = \OpenEMR\Services\Insurance\CoverageDay::forLabOrder($porow['date_collected'] ?? null, $porow['date_ordered'], \OpenEMR\Services\Insurance\CoverageDay::today())->format('Y-m-d');
+        $labDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
+            is_string($porow['date_collected'] ?? null) ? $porow['date_collected'] : null,
+            is_string($porow['date_ordered'] ?? null) ? $porow['date_ordered'] : null
+        )->format('Y-m-d');
         $payers = $this->loadPayerInfo($porow['pid'], $labDay);
         $setid = 0;
         if ($bill_type == 'T') {

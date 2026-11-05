@@ -1018,8 +1018,8 @@ if ($alertmsg === '' && (($_POST['form_save'] ?? null) || filter_input(INPUT_GET
                 //
                 // Twin (insurance-reference): the levels in force on the visit date (master: every level ever on file).
                 $NumberOfInsurance = count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
-                    (int)$pid,
-                    \OpenEMR\Services\Insurance\CoverageDay::forVisit($dispdate, \OpenEMR\Services\Insurance\CoverageDay::today())
+                    is_numeric($pid) ? (int)$pid : 0,
+                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($dispdate) ? $dispdate : null)
                 ));
                 $duept = 0;
                 if ((($NumberOfInsurance == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) { // Patient balance
