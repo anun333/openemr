@@ -140,6 +140,29 @@ class DateFormatterUtilsTest extends TestCase
         $this->assertSame('2024-06-15', $result);
     }
 
+    /**
+     * The issue form's Active checkbox types YYYY-M-D and its Resolved outcome YYYY-MM-DD, whatever the
+     * site's format; on a US or international site that was split on '/' and stored as 0000-00-00.
+     */
+    public function testDateToYYYYMMDDAcceptsIsoOnEverySite(): void
+    {
+        foreach ([DateFormatterUtils::DATE_FORMAT_US, DateFormatterUtils::DATE_FORMAT_INTL] as $format) {
+            $globals = $this->createGlobals($format);
+            $this->assertSame('2026-11-04', DateFormatterUtils::DateToYYYYMMDD('2026-11-4', $globals));
+            $this->assertSame('2026-11-04', DateFormatterUtils::DateToYYYYMMDD('2026-11-04', $globals));
+        }
+    }
+
+    public function testDateToYYYYMMDDKeepsWhatItGaveForAnythingElse(): void
+    {
+        $us = $this->createGlobals(DateFormatterUtils::DATE_FORMAT_US);
+        // not a real day, or not ISO: the value it always gave (the database stores it as zero)
+        $this->assertSame('-2026-02-30-', @DateFormatterUtils::DateToYYYYMMDD('2026-02-30', $us));
+        $this->assertSame('2024-6-15', DateFormatterUtils::DateToYYYYMMDD('6/15/2024', $us));
+        $iso = $this->createGlobals(DateFormatterUtils::DATE_FORMAT_ISO);
+        $this->assertSame('2026-11-4', DateFormatterUtils::DateToYYYYMMDD('2026-11-4', $iso));
+    }
+
     public function testDateToYYYYMMDDWithEmptyString(): void
     {
         $globals = $this->createGlobals();

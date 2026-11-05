@@ -20,6 +20,7 @@ namespace OpenEMR\Services\Utils;
 
 use DateTime;
 use DateTimeImmutable;
+use OpenEMR\Common\Dates\DateInput;
 use OpenEMR\Core\OEGlobalsBag;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
@@ -94,6 +95,13 @@ class DateFormatterUtils
         }
 
         if ($dateFormat === self::DATE_FORMAT_US || $dateFormat === self::DATE_FORMAT_INTL) {
+            // An ISO date (YYYY-M-D) is unambiguous on any site: the issue form's Active checkbox and
+            // Resolved outcome type one into a display-format field. Splitting it on '/' gave a string
+            // the database stored as 0000-00-00.
+            $iso = is_string($DateValue) ? DateInput::iso($DateValue) : null;
+            if ($iso !== null) {
+                return $iso;
+            }
             $DateValueArray = explode('/', (string) $DateValue);
             if ($dateFormat === self::DATE_FORMAT_US) {
                 return $DateValueArray[2] . '-' . $DateValueArray[0] . '-' . $DateValueArray[1];
