@@ -149,7 +149,7 @@ class CdaImportPayerTest extends TestCase
         $this->assertInstanceOf(\ADORecordSet::class, $qdmPatients);
         $patient = QueryUtils::fetchArrayFromResultSet($qdmPatients);
         $this->assertIsArray($patient);
-        $model = json_decode((string) json_encode($qdmService->makeQdmModel(new QdmRecord($patient, $patient['pid'], $patient['pid']))), true);
+        $model = json_decode((string) json_encode($qdmService->makeQdmModel(new QdmRecord($patient, self::number($patient['pid'] ?? null), self::number($patient['pid'] ?? null)))), true);
         $this->assertIsArray($model);
         $elements = $model['dataElements'] ?? null;
         $this->assertIsArray($elements);

@@ -318,7 +318,7 @@ class Claim
         for ($i = 1; $i < count($this->payers); ++$i) {
             if (
                 $billrow['process_date'] &&
-                $this->payers[0]['data']['provider'] == $this->payers[$i]['data']['provider']
+                ($this->payers[0]['data']['provider'] ?? null) == ($this->payers[$i]['data']['provider'] ?? null)
             ) {
                 $tmp = $this->payers[0];
                 $this->payers[0] = $this->payers[$i];
@@ -1094,30 +1094,13 @@ class Claim
 
   // Returns 'P', 'S' or 'T'.
   //
-    /**
-     * Twin (insurance-reference): DEFAULT 2 (#15038): when the only payer in force
-     * is stored as secondary, SBR01 stays its stored level ('S'), as before.
-     * X12 RFI 1980 ("there must be a primary payer") would set this to true.
-     */
-    public const SEND_SOLE_PAYER_AS_PRIMARY = false;
-
+    // Twin (insurance-reference): DEFAULT 2 (#15038): when the only payer in force is stored as
+    // secondary, SBR01 stays its stored level ('S'), as before. X12 RFI 1980 ("there must be a
+    // primary payer") would send 'P' for payer 0 when no payer in force is stored as primary: that
+    // change would go here.
     public function payerSequence($ins = 0): string
     {
-        $level = strtoupper(substr(($this->payers[$ins]['data']['type'] ?? ''), 0, 1));
-        if (self::SEND_SOLE_PAYER_AS_PRIMARY && $ins === 0 && $level !== '' && !$this->hasStoredPrimaryInForce()) {
-            return 'P';
-        }
-        return $level;
-    }
-
-    private function hasStoredPrimaryInForce(): bool
-    {
-        foreach ($this->payers as $payer) {
-            if (($payer['data']['type'] ?? '') === 'primary') {
-                return true;
-            }
-        }
-        return false;
+        return strtoupper(substr(($this->payers[$ins]['data']['type'] ?? ''), 0, 1));
     }
 
   // Returns the HIPAA code of the patient-to-subscriber relationship.
