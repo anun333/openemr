@@ -134,12 +134,16 @@ if ($exclude_policy != "") {
         }
         // Twin (insurance-reference): the primary in force on the day DTP*291 sends.
         $row = array_merge($row, EDI270::coverageColumns((int)$row['pid'], EDI270::eligibilityDay($row['pc_eventDate'] ?? null, $X12info)));
-        if (empty($row['policy_number']) || in_array($row['policy_number'], $excludedPolicies ?? [], true)) {
+        // As master's SQL compared them: a blank or missing number is left out ('0' is a number), and an
+        // excluded number matches whatever its case or trailing spaces (the column's collation).
+        $policyNumber = $row['policy_number'] ?? null;
+        $fold = static fn(mixed $v): string => strtolower(rtrim(is_scalar($v) ? (string)$v : ''));
+        if ($policyNumber === null || $policyNumber === '' || in_array($fold($policyNumber), array_map($fold, $excludedPolicies ?? []), true)) {
             continue;
         }
         $res[] = $row;
     }
-    usort($res, static fn(array $a, array $b): int => strcmp((string)($a['payer_name'] ?? ''), (string)($b['payer_name'] ?? '')));
+    usort($res, static fn(array $a, array $b): int => strcasecmp((string)($a['payer_name'] ?? ''), (string)($b['payer_name'] ?? '')));
     // Get the facilities information
     $facilities     = getUserFacilities($session->get('authUserID'));
 
