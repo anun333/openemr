@@ -281,27 +281,12 @@ class TransmitProperties
              WHERE pid = ?;
         SQL;
 
-        $insurance = <<<SQL
-        select subscriber_lname AS ResponsiblePartyLastName,
-               subscriber_fname AS ResponsiblePartyFirstName,
-               subscriber_street AS ResponsiblePartyAddressLine1,
-               subscriber_postal_code AS ResponsiblePartyPostalCode,
-               subscriber_city AS ResponsiblePartyCity,
-               subscriber_state AS ResponsiblePartyState,
-               subscriber_phone AS ResponsiblePartyPrimaryPhone,
-               subscriber_street_line_2 AS ResponsiblePartyAddressLine2
-          FROM insurance_data
-         WHERE pid = ?
-           AND subscriber_relationship > ''
-           AND subscriber_relationship != 'self'
-           AND type = 'primary'
-        SQL;
 
         $session = SessionWrapperFactory::getInstance()->getActiveSession();
         $relation = sqlQuery($guardian, [$session->get('pid')]);
         // if no guardian then check for primary insurance subscriber
         if (empty($relation['ResponsiblePartyLastName'])) {
-            $relation = sqlQuery($insurance, [$session->get('pid')]);
+            $relation = \OpenEMR\Services\Insurance\PolicyRecords::primarySubscriberAsResponsibleParty($session->get('pid'));
         }
         if (empty($relation)) {
             return 'REQED:{demographics}' . xlt("Patient is under 19 years old. A Responsible Party is required. From the Patient Chart select Demographics Primary Insurance or Guardian to add a person.");
@@ -523,7 +508,7 @@ class TransmitProperties
     private function getSubscriber(): mixed
     {
         $session = SessionWrapperFactory::getInstance()->getActiveSession();
-        $relation = sqlQuery("select subscriber_relationship from insurance_data where pid = ? and type = 'primary'", [$session->get('pid')]);
+        $relation = \OpenEMR\Services\Insurance\PolicyRecords::primaryRelationshipRow($session->get('pid'));
         $relation ??= ['subscriber_relationship' => ''];
 
         return $relation['subscriber_relationship'] ?? '';

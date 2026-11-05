@@ -127,22 +127,7 @@ class eRxStore
 
     public function getPatientHealthplansByPatientId($patientId)
     {
-        return sqlStatement(
-            'SELECT `ins`.`name`
-			FROM (
-				SELECT
-					`id`.`type`,
-					`ic`.`name`
-				FROM `insurance_data` AS `id`
-					LEFT JOIN `insurance_companies` AS `ic` ON `ic`.`id` = `id`.`provider`
-				WHERE `id`.`pid` = ?
-					AND `id`.`subscriber_relationship` = \'self\'
-					AND `id`.`provider` > 0
-				ORDER BY `id`.`date` DESC
-			) AS `ins`
-			GROUP BY `ins`.`type`;',
-            [$patientId]
-        );
+        return \OpenEMR\Services\Insurance\PolicyRecords::selfPlanNamesStatement($patientId);
     }
 
     public function getPatientAllergiesByPatientId($patientId)

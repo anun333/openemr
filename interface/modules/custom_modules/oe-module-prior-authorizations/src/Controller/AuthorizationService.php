@@ -188,7 +188,7 @@ class AuthorizationService
         $sql = "SELECT DISTINCT pd.pid AS mrn, pd.fname, pd.lname, mpa.pid, mpa.auth_num, mpa.start_date, mpa.end_date, mpa.cpt, mpa.init_units, ins.provider " . "
             FROM `patient_data` pd " . "
             LEFT JOIN  `module_prior_authorizations` mpa ON pd.pid = mpa.pid " . "
-            LEFT JOIN `insurance_data` ins ON  `ins`.`pid` = `pd`.`pid` " . "
+            LEFT JOIN " . \OpenEMR\Services\Insurance\PolicySql::sqlPoliciesWithPayerName('ins') . " ON  `ins`.`pid` = `pd`.`pid` " . "
             ORDER BY pd.lname";
 
         try {
@@ -228,9 +228,7 @@ class AuthorizationService
 
     public static function insuranceName($pid): string
     {
-        $insurance = sqlQuery("SELECT ic.name FROM `insurance_data` id
-            JOIN insurance_companies ic ON id.provider = ic.id
-            WHERE `pid` = ? AND type = 'primary'", [$pid]);
+        $insurance = \OpenEMR\Services\Insurance\PolicyRecords::primaryPayerNameRow($pid);
 
         if (is_array($insurance) && array_key_exists('name', $insurance)) {
             return (string) $insurance['name'];

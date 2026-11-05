@@ -899,23 +899,7 @@ function PatientFreeformAllergy($doc, $r, $pid): array
 
 function PatientFreeformHealthplans($doc, $r, $pid): void
 {
-    $resource = sqlStatement(
-        'SELECT
-            `ins`.`name`
-        FROM (
-            SELECT
-                `id`.`type`,
-                `ic`.`name`
-            FROM `insurance_data` AS `id`
-                LEFT JOIN `insurance_companies` AS `ic` ON `ic`.`id` = `id`.`provider`
-            WHERE `id`.`pid` = ?
-                AND `id`.`subscriber_relationship` = \'self\'
-                AND `id`.`provider` > 0
-            ORDER BY `id`.`date` DESC
-        ) AS `ins`
-        GROUP BY `ins`.`type`;',
-        [$pid]
-    );
+    $resource = \OpenEMR\Services\Insurance\PolicyRecords::selfPlanNamesStatement($pid);
 
     while ($row = sqlFetchArray($resource)) {
         $healthplanName = $doc->createElement('healthplanName');
