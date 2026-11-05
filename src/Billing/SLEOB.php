@@ -14,8 +14,12 @@
 
 namespace OpenEMR\Billing;
 
+use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\PaymentProcessing\Recorder;
+use OpenEMR\Services\Insurance\CoverageDay;
+use OpenEMR\Services\Insurance\InsuranceLevel;
+use OpenEMR\Services\InsuranceService;
 
 class SLEOB
 {
@@ -253,17 +257,17 @@ class SLEOB
             return 0;
         }
 
-        $tmp = [1 => 'primary', 2 => 'secondary', 3 => 'tertiary'];
-        $value = $tmp[$payer_type];
-        $query = "SELECT provider FROM insurance_data WHERE " .
-            "pid = ? AND type = ? AND (date <= ? OR date IS NULL) AND (date_end >= ? OR date_end IS NULL) " .
-            "ORDER BY date DESC LIMIT 1";
-        $nprow = sqlQuery($query, [$patient_id, $value, $date_of_service, $date_of_service]);
-        if (empty($nprow)) {
-            return 0;
-        }
-
-        return $nprow['provider'];
+        // Twin (insurance-reference): the policy at that level in force on the date of service,
+        // through the coverage service (ERA and manual posting, the secondary claim, batch
+        // payments, collections). Master's own SQL read a zero end date as ended and broke a tie
+        // between two undated rows by database order; it returned the stored provider text.
+        $level = [1 => InsuranceLevel::Primary, 2 => InsuranceLevel::Secondary, 3 => InsuranceLevel::Tertiary][(int)$payer_type];
+        $policy = (new InsuranceService())->getEffectiveInsuranceAt(
+            is_numeric($patient_id) ? (int)$patient_id : 0,
+            $level,
+            (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date_of_service) ? $date_of_service : null)
+        );
+        return $policy === null ? 0 : $policy->companyId;
     }
 
     /**

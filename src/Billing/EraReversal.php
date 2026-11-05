@@ -24,7 +24,11 @@ declare(strict_types=1);
 
 namespace OpenEMR\Billing;
 
+use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Services\Insurance\CoverageDay;
+use OpenEMR\Services\Insurance\InsuranceLevel;
+use OpenEMR\Services\InsuranceService;
 
 final readonly class EraReversal
 {
@@ -107,18 +111,14 @@ final readonly class EraReversal
      */
     private function providers(int $pid, string $dateOfService): array
     {
+        // Twin (insurance-reference): the coverage service's policies in force on the date of
+        // service, as SLEOB::arGetPayerID() now finds them. Master stopped at the first level
+        // with nothing in force, so a sole current secondary was never found.
         $providers = [];
-        foreach ([1 => 'primary', 2 => 'secondary', 3 => 'tertiary'] as $level => $type) {
-            $provider = QueryUtils::fetchSingleValue(
-                'SELECT provider FROM insurance_data WHERE pid = ? AND type = ? '
-                . 'AND (date <= ? OR date IS NULL) AND (date_end >= ? OR date_end IS NULL) ORDER BY date DESC LIMIT 1',
-                'provider',
-                [$pid, $type, $dateOfService, $dateOfService]
-            );
-            if (!is_scalar($provider) || in_array((string) $provider, ['', '0'], true)) {
-                break;
-            }
-            $providers[$level] = (string) $provider;
+        $levels = [InsuranceLevel::Primary->value => 1, InsuranceLevel::Secondary->value => 2, InsuranceLevel::Tertiary->value => 3];
+        $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit($dateOfService);
+        foreach ((new InsuranceService())->getEffectiveInsurances($pid, $day) as $policy) {
+            $providers[$levels[$policy->level->value]] = (string) $policy->companyId;
         }
         return $providers;
     }
