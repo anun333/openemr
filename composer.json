@@ -95,6 +95,7 @@
         "omnipay/stripe": "^3.2.0",
         "openemr/mustache": "^2.15.2",
         "openemr/oe-cqm-parsers": "^7.0.4",
+        "openemr/oe-module-insurance": "^0.1",
         "paragonie/constant_time_encoding": "^3.1.3",
         "particle/validator": "^2.3.6",
         "pear/archive_tar": "^1.6.0",
@@ -163,6 +164,13 @@
         "symfony/panther": "^2.0"
     },
     "repositories": [
+        {
+            "type": "path",
+            "url": "packages/oe-module-insurance",
+            "options": {
+                "symlink": true
+            }
+        },
         {
             "type": "vcs",
             "url": "https://github.com/openemr/wkhtmltopdf-openemr"

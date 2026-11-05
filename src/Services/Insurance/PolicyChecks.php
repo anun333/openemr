@@ -1,11 +1,11 @@
 <?php
 
 /**
- * What the coverage validator asks before an insert, an update or a swap:
- * how many policies a level has on a start day or open-ended, and a
- * policy's start and level by uuid. Each is the statement CoverageValidator
- * ran before the boundary branch, moved here unchanged. Split from
- * PolicyRecords by question: these answer the validator, not a screen.
+ * PolicyChecks: the insurance module's PolicyChecks under the name the boundary branch gave it, so its callers are
+ * unchanged. Each method is one call through the Coverage contract
+ * (OpenEMR\BC\ServiceContainer::getInsuranceCoverage()). To be deprecated once core's callers ask
+ * the contract themselves (a @deprecated tag now would put every caller on PHPStan's deprecation
+ * rule). Generated from the module's class.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -18,7 +18,7 @@ declare(strict_types=1);
 
 namespace OpenEMR\Services\Insurance;
 
-use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\BC\ServiceContainer;
 
 final class PolicyChecks
 {
@@ -31,11 +31,7 @@ final class PolicyChecks
      */
     public static function latestStartAtLevel(mixed $pid, mixed $type): mixed
     {
-        return QueryUtils::fetchSingleValue(
-            "SELECT `date` FROM insurance_data WHERE pid = ? AND type = ? ORDER BY date DESC LIMIT 1",
-            'date',
-            [$pid, $type]
-        );
+        return ServiceContainer::getInsuranceCoverage()->latestStartAtLevel($pid, $type);
     }
 
     /**
@@ -45,7 +41,7 @@ final class PolicyChecks
      */
     public static function startAndLevelByUuid(string $uuidBytes): array
     {
-        return QueryUtils::fetchRecords("SELECT `date`,`type` FROM insurance_data WHERE uuid = ?", [$uuidBytes]);
+        return ServiceContainer::getInsuranceCoverage()->startAndLevelByUuid($uuidBytes);
     }
 
     /**
@@ -54,13 +50,7 @@ final class PolicyChecks
      */
     public static function countStartingAt(mixed $pid, mixed $type, mixed $date, ?string $exceptUuidBytes): mixed
     {
-        $sqlCheck = "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date = ?";
-        $binds = [$pid, $type, $date];
-        if ($exceptUuidBytes !== null) {
-            $sqlCheck .= " AND uuid != ?";
-            $binds[] = $exceptUuidBytes;
-        }
-        return QueryUtils::fetchSingleValue($sqlCheck, 'cnt', $binds);
+        return ServiceContainer::getInsuranceCoverage()->countStartingAt($pid, $type, $date, $exceptUuidBytes);
     }
 
     /**
@@ -69,13 +59,7 @@ final class PolicyChecks
      */
     public static function countOpenAtLevel(mixed $pid, mixed $type, ?string $exceptUuidBytes): mixed
     {
-        $sqlCheck = "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date_end IS NULL";
-        $binds = [$pid, $type];
-        if ($exceptUuidBytes !== null) {
-            $sqlCheck .= " AND uuid != ?";
-            $binds[] = $exceptUuidBytes;
-        }
-        return QueryUtils::fetchSingleValue($sqlCheck, 'cnt', $binds);
+        return ServiceContainer::getInsuranceCoverage()->countOpenAtLevel($pid, $type, $exceptUuidBytes);
     }
 
     /**
@@ -83,10 +67,6 @@ final class PolicyChecks
      */
     public static function countDatedStartingAt(mixed $pid, mixed $type, mixed $date): mixed
     {
-        return QueryUtils::fetchSingleValue(
-            "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date IS NOT NULL AND date = ?",
-            'cnt',
-            [$pid, $type, $date]
-        );
+        return ServiceContainer::getInsuranceCoverage()->countDatedStartingAt($pid, $type, $date);
     }
 }

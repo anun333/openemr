@@ -12,13 +12,13 @@
 
 declare(strict_types=1);
 
-namespace OpenEMR\Tests\Isolated\Services\Insurance;
+namespace OpenEMR\Tests\Isolated\Modules\Insurance;
 
 use DateTimeImmutable;
 use DateTimeZone;
 use OpenEMR\Common\Uuid\UuidRegistry;
+use OpenEMR\Modules\Insurance\Policies\EffectiveInsuranceRule;
 use OpenEMR\Services\Insurance\EffectiveInsurance;
-use OpenEMR\Services\Insurance\EffectiveInsuranceRule;
 use OpenEMR\Services\Insurance\InsuranceLevel;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;

@@ -1,16 +1,11 @@
 <?php
 
 /**
- * SQL the coverage service publishes for another domain's query to embed.
- * The Billing Manager, its print views, the day sheets and the OFX export
- * filter their billing query by the patient's primary policy; the Indigent
- * Patients report, Patient List Creation and the prior authorizations list
- * join the policies in. Rather than name the policy table in those queries,
- * they append a predicate or join a relation from here: the table and the
- * rule live in the service, and the statement still runs as one query (a
- * module would publish these as views, or answer with id lists). $patient,
- * $visitDate and $alias name the caller's columns and alias (literals
- * only).
+ * PolicySql: the insurance module's PolicySql under the name the boundary branch gave it, so its callers are
+ * unchanged. Each method is one call through the Coverage contract
+ * (OpenEMR\BC\ServiceContainer::getInsuranceCoverage()). To be deprecated once core's callers ask
+ * the contract themselves (a @deprecated tag now would put every caller on PHPStan's deprecation
+ * rule). Generated from the module's class.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -22,6 +17,8 @@
 declare(strict_types=1);
 
 namespace OpenEMR\Services\Insurance;
+
+use OpenEMR\BC\ServiceContainer;
 
 final class PolicySql
 {
@@ -35,7 +32,7 @@ final class PolicySql
      */
     public static function sqlPrimaryOnFile(string $patient): string
     {
-        return "EXISTS (SELECT 1 FROM insurance_data AS ins_p WHERE ins_p.pid = $patient AND ins_p.type = 'primary')";
+        return ServiceContainer::getInsuranceCoverage()->sqlPrimaryOnFile($patient);
     }
 
     /**
@@ -45,10 +42,7 @@ final class PolicySql
      */
     public static function sqlPrimaryPayerOnVisit(bool $withPayer, string $patient, string $visitDate): string
     {
-        $match = $withPayer
-            ? "ins_c.provider > '0' and (ins_c.date <= $visitDate OR ins_c.date IS NULL)"
-            : "(ins_c.provider = '0' or ins_c.date > $visitDate)";
-        return "EXISTS (SELECT 1 FROM insurance_data AS ins_c WHERE ins_c.pid = $patient AND ins_c.type = 'primary' AND $match)";
+        return ServiceContainer::getInsuranceCoverage()->sqlPrimaryPayerOnVisit($withPayer, $patient, $visitDate);
     }
 
     /**
@@ -57,7 +51,7 @@ final class PolicySql
      */
     public static function sqlPrimariesWithoutPayer(string $alias): string
     {
-        return "(SELECT pid FROM insurance_data WHERE type = 'primary' AND provider = '') AS $alias";
+        return ServiceContainer::getInsuranceCoverage()->sqlPrimariesWithoutPayer($alias);
     }
 
     /**
@@ -67,7 +61,6 @@ final class PolicySql
      */
     public static function sqlPoliciesWithPayerName(string $alias): string
     {
-        return "(SELECT insd.pid, insd.type, insd.provider, ic.name FROM insurance_data AS insd " .
-            "LEFT JOIN insurance_companies AS ic ON ic.id = insd.provider) AS $alias";
+        return ServiceContainer::getInsuranceCoverage()->sqlPoliciesWithPayerName($alias);
     }
 }

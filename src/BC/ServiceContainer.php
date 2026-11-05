@@ -29,6 +29,11 @@ use OpenEMR\Common\Crypto;
 use OpenEMR\Common\Logging;
 use OpenEMR\Common\Twig\TwigContainer;
 use OpenEMR\Core\OEGlobalsBag;
+use OpenEMR\Core\RequiredPackages;
+use OpenEMR\Services\Insurance\Contract\{
+    Coverage as InsuranceCoverage,
+    Payer as InsurancePayer,
+};
 use OpenEMR\Services\Storage\Location;
 use OpenEMR\Services\Storage\Manager;
 use OpenEMR\Services\Storage\ManagerInterface;
@@ -176,6 +181,30 @@ class ServiceContainer
         return self::resolveOrCreate(
             ClientInterface::class,
             static fn(): ClientInterface&GuzzleClientInterface => self::getGuzzle(),
+        );
+    }
+
+    /**
+     * The insurance coverage contract (patients' policies), as the insurance package implements it. Core requires
+     * that package (composer.json; RequiredPackages), so this resolves in every entry point; a module may still override() it.
+     */
+    public static function getInsuranceCoverage(): InsuranceCoverage
+    {
+        return self::resolveOrCreate(
+            InsuranceCoverage::class,
+            static fn(): InsuranceCoverage => RequiredPackages::make(InsuranceCoverage::class),
+        );
+    }
+
+    /**
+     * The insurance payer contract (insurance companies), as the insurance package implements it. Core requires
+     * that package (composer.json; RequiredPackages), so this resolves in every entry point; a module may still override() it.
+     */
+    public static function getInsurancePayer(): InsurancePayer
+    {
+        return self::resolveOrCreate(
+            InsurancePayer::class,
+            static fn(): InsurancePayer => RequiredPackages::make(InsurancePayer::class),
         );
     }
 

@@ -1,0 +1,19 @@
+{
+    "name": "openemr/oe-module-insurance",
+    "description": "Insurance for OpenEMR: patients' policies and the payers behind them, with the rule for which policy is in force on a day. Required by core, which asks it through the coverage and payer contracts (OpenEMR\\Services\\Insurance\\Contract) and finds its container definitions in config/services.php.",
+    "license": "GPL-3.0",
+    "type": "library",
+    "version": "0.1.0",
+    "keywords": [
+        "openemr",
+        "openemr-module"
+    ],
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "OpenEMR\\Modules\\Insurance\\": "src/"
+        }
+    }
+}

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d8b57aeeff8307a7a1b04c02d86b3416",
+    "content-hash": "5b943dc00d99b83df64664da3decf345",
     "packages": [
         {
             "name": "academe/authorizenet-objects",
@@ -6689,6 +6689,36 @@
                 "source": "https://github.com/openemr/oe-module-installer-plugin/tree/0.1.5"
             },
             "time": "2021-05-03T14:22:43+00:00"
+        },
+        {
+            "name": "openemr/oe-module-insurance",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "packages/oe-module-insurance",
+                "reference": "d58e9633b67eb2837f84335da8899b3fcde1dda4"
+            },
+            "require": {
+                "php": ">=8.2"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "OpenEMR\\Modules\\Insurance\\": "src/"
+                }
+            },
+            "license": [
+                "GPL-3.0"
+            ],
+            "description": "Insurance for OpenEMR: patients' policies and the payers behind them, with the rule for which policy is in force on a day. Required by core, which asks it through the coverage and payer contracts (OpenEMR\\Services\\Insurance\\Contract) and finds its container definitions in config/services.php.",
+            "keywords": [
+                "openemr",
+                "openemr-module"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "paragonie/constant_time_encoding",
