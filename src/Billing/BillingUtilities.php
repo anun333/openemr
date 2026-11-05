@@ -1768,9 +1768,7 @@ class BillingUtilities
     //
     public static function getCopay($patient_id, $encdate)
     {
-        $tmp = sqlQuery("SELECT provider, copay FROM insurance_data " .
-            "WHERE pid = ? AND type = 'primary' " .
-            "AND (date <= ? OR date IS NULL) AND (date_end >= ? OR date_end IS NULL) ORDER BY date DESC LIMIT 1", [$patient_id, $encdate, $encdate]);
+        $tmp = \OpenEMR\Services\Insurance\PolicyRecords::primaryCopayOn($patient_id, $encdate);
         if (!empty($tmp['provider'])) {
             return sprintf('%01.2f', floatval($tmp['copay']));
         }

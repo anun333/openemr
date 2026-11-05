@@ -198,9 +198,8 @@ if (!empty($_POST['form_refresh'])) {
 
     $rez = sqlStatement("SELECT " .
     "e.date, e.encounter, p.pid, p.lname, p.fname, p.mname, p.ss " .
-    "FROM form_encounter AS e, patient_data AS p, insurance_data AS i " .
-    "WHERE p.pid = e.pid AND i.pid = e.pid AND i.type = 'primary' " .
-    "AND i.provider = ''$where " .
+    "FROM form_encounter AS e, patient_data AS p, " . \OpenEMR\Services\Insurance\PolicySql::sqlPrimariesWithoutPayer('i') . " " .
+    "WHERE p.pid = e.pid AND i.pid = e.pid$where " .
     "ORDER BY p.lname, p.fname, p.mname, p.pid, e.date", $sqlBindArray);
 
     $total_amount = 0;

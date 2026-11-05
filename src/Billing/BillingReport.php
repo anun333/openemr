@@ -75,10 +75,10 @@ class BillingReport
                     }
                     $sanitizedEncounters = substr($sanitizedEncounters, 0, -1);
                     $query_part .= ' AND form_encounter.encounter in (' . $sanitizedEncounters . ')';
-                } elseif (str_contains((string) $criteria_value, "insurance_data.provider|=|1")) {
-                    $query_part .= ' AND ' . "insurance_data.provider > '0' and (insurance_data.date <= form_encounter.date OR insurance_data.date IS NULL)";
-                } elseif (str_contains((string) $criteria_value, "insurance_data.provider|=|0")) {
-                    $query_part .= ' AND ' . "(insurance_data.provider = '0' or insurance_data.date > form_encounter.date)";
+                } elseif (str_contains((string) $criteria_value, \OpenEMR\Services\Insurance\InsuranceTables::POLICIES . ".provider|=|1")) {
+                    $query_part .= ' AND ' . \OpenEMR\Services\Insurance\PolicySql::sqlPrimaryPayerOnVisit(true, 'form_encounter.pid', 'form_encounter.date');
+                } elseif (str_contains((string) $criteria_value, \OpenEMR\Services\Insurance\InsuranceTables::POLICIES . ".provider|=|0")) {
+                    $query_part .= ' AND ' . \OpenEMR\Services\Insurance\PolicySql::sqlPrimaryPayerOnVisit(false, 'form_encounter.pid', 'form_encounter.date');
                 } elseif (str_contains((string) $criteria_value, "form_encounter.date|between|")) {
                     $elements = explode('|', (string) $criteria_value);
                     $query_part .= ' AND ' . "(form_encounter.date between '" . add_escape_custom($elements[2]) . "' and '" . add_escape_custom($elements[3]) . "')";
@@ -145,7 +145,6 @@ class BillingReport
             "billing.activity = 1 " .
             "LEFT OUTER JOIN patient_data on patient_data.pid = form_encounter.pid " .
             "LEFT OUTER JOIN claims on claims.patient_id = form_encounter.pid and claims.encounter_id = form_encounter.encounter " .
-            "LEFT OUTER JOIN insurance_data on insurance_data.pid = form_encounter.pid and insurance_data.type = 'primary' " .
             "WHERE 1=1 $query_part  " . " $auth " . " $billstring " .
             "ORDER BY form_encounter.provider_id, form_encounter.encounter, form_encounter.pid, billing.code_type, billing.code ASC";
         //echo $sql;
@@ -178,7 +177,6 @@ class BillingReport
             "billing.activity = 1 " .
             "LEFT OUTER JOIN patient_data on patient_data.pid = form_encounter.pid " .
             "LEFT OUTER JOIN claims on claims.patient_id = form_encounter.pid and claims.encounter_id = form_encounter.encounter " .
-            "LEFT OUTER JOIN insurance_data on insurance_data.pid = form_encounter.pid and insurance_data.type = 'primary' " .
             "WHERE 1=1 $query_part  " . " $auth " . " $billstring " .
             "ORDER BY form_encounter.encounter, form_encounter.pid, billing.code_type, billing.code ASC";
         //echo $sql;
@@ -207,12 +205,12 @@ class BillingReport
         // See above comment in self::getBillsBetween().
         $array = [];
         $sql = "select distinct $cols " .
-            "from form_encounter, billing, patient_data, claims, insurance_data where " .
+            "from form_encounter, billing, patient_data, claims where " .
             "billing.encounter = form_encounter.encounter and " .
             "billing.pid = form_encounter.pid and " .
             "patient_data.pid = form_encounter.pid and " .
             "claims.patient_id = form_encounter.pid and claims.encounter_id = form_encounter.encounter and " .
-            "insurance_data.pid = form_encounter.pid and insurance_data.type = 'primary' " .
+            \OpenEMR\Services\Insurance\PolicySql::sqlPrimaryOnFile('form_encounter.pid') . " " .
             $auth .
             $billstring . $query_part . " and " .
             "billing.code_type like ? and " .
@@ -253,8 +251,7 @@ class BillingReport
             . "billing.encounter = form_encounter.encounter AND "
             . "billing.pid = form_encounter.pid "
             . "join claims on claims.patient_id = form_encounter.pid and claims.encounter_id = form_encounter.encounter "
-            . "join insurance_data on insurance_data.pid = form_encounter.pid and insurance_data.type = 'primary' "
-            . "where billed = '1' "
+            . "where billed = '1' and " . \OpenEMR\Services\Insurance\PolicySql::sqlPrimaryOnFile('form_encounter.pid') . " "
             . "$auth "
             . "$billstring  $query_part  "
             . "order by billing.pid,billing.encounter";

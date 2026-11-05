@@ -93,7 +93,6 @@ function getBillsBetweendayReport(
     "billing.activity = 1 " .
     "LEFT OUTER JOIN patient_data ON patient_data.pid = form_encounter.pid " .
     "LEFT OUTER JOIN claims on claims.patient_id = form_encounter.pid and claims.encounter_id = form_encounter.encounter " .
-    "LEFT OUTER JOIN insurance_data on insurance_data.pid = form_encounter.pid and insurance_data.type = 'primary' " .
     "WHERE 1=1 $query_part AND billing.fee!=0 " . " $auth " . " $billstring " .
     "ORDER BY  fulname ASC, date ASC, pid ";
 

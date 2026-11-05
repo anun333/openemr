@@ -148,10 +148,8 @@ if (isset($_POST["mode"])) {
         if ($PaymentFrom != '') {
             if ($PayingEntity == 'insurance' || $PayingEntity == '') {
                 //-------------------
-                $res = sqlStatement("SELECT insurance_companies.name FROM insurance_companies
-            where insurance_companies.id =?", [$PaymentFrom]);
-                $row = sqlFetchArray($res);
-                $div_after_save = $row['name'];
+                $row = \OpenEMR\Services\InsuranceCompanyService::columnsOf($PaymentFrom, 'name');
+                $div_after_save = is_array($row) ? $row['name'] : null;
                 //-------------------
 
                 $QueryString .= " $And payer_id =?";
@@ -486,10 +484,8 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                                         $Payer = '';
                                         if ($RowSearch['payer_id'] * 1 > 0) {
                                             //-------------------
-                                            $res = sqlStatement("SELECT insurance_companies.name FROM insurance_companies
-                                                    where insurance_companies.id =?", [$RowSearch['payer_id']]);
-                                            $row = sqlFetchArray($res);
-                                            $Payer = $row['name'];
+                                            $row = \OpenEMR\Services\InsuranceCompanyService::columnsOf($RowSearch['payer_id'], 'name');
+                                            $Payer = is_array($row) ? $row['name'] : null;
                                             //-------------------
                                         } elseif ($RowSearch['patient_id'] * 1 > 0) {
                                             //-------------------

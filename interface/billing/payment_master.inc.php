@@ -88,12 +88,13 @@ if ($payment_id > 0) {
     $pay_amount = $row['sum_pay_amount'];
     $UndistributedAmount = $pay_total - $pay_amount - $global_amount;
 
-    $res = sqlStatement("SELECT check_date ,reference ,insurance_companies.name,
+    $res = sqlStatement("SELECT check_date ,reference ,
         payer_id,pay_total,payment_type,post_to_date,patient_id ,
         adjustment_code,description,deposit_date,payment_method
-        FROM ar_session left join insurance_companies on ar_session.payer_id=insurance_companies.id where ar_session.session_id =?", [$payment_id]);
+        FROM ar_session where ar_session.session_id =?", [$payment_id]);
     $row = sqlFetchArray($res);
-    $InsuranceCompanyName = $row['name'];
+    // the payer's name (the company the session's payer_id names, or none)
+    $InsuranceCompanyName = is_array($row) ? \OpenEMR\Services\InsuranceCompanyService::nameOf($row['payer_id']) : null;
     $InsuranceCompanyId = $row['payer_id'];
     $PatientId = $row['patient_id'];
     $CheckNumber = $row['reference'];
@@ -106,9 +107,7 @@ if ($payment_id > 0) {
     $DepositDate = Utilities::isDateEmpty($row['deposit_date']) ? '' : $row['deposit_date'];
     $Description = $row['description'];
     if ($row['payment_type'] == 'insurance' || $row['payer_id'] * 1 > 0) {
-        $res = sqlStatement("SELECT insurance_companies.name FROM insurance_companies
-            where insurance_companies.id =?", [$InsuranceCompanyId]);
-        $row = sqlFetchArray($res);
+        $row = \OpenEMR\Services\InsuranceCompanyService::columnsOf($InsuranceCompanyId, 'name');
         $div_after_save = $row['name'] ?? '';
         $TypeCode = $InsuranceCompanyId;
         if ($PaymentType == '') {

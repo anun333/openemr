@@ -661,7 +661,7 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                             xl("X12 Partner"),
                             xl("User")
                         ];
-                        $TPSCriteriaKeyMaster = "form_encounter.date,billing.date,claims.process_time,claims.target,patient_data.fname," . "form_encounter.pid,claims.payer_id,form_encounter.encounter,insurance_data.provider,billing.id,billing.billed," . "billing.authorized,form_encounter.last_level_billed,billing.x12_partner_id,billing.user";
+                        $TPSCriteriaKeyMaster = "form_encounter.date,billing.date,claims.process_time,claims.target,patient_data.fname," . "form_encounter.pid,claims.payer_id,form_encounter.encounter," . \OpenEMR\Services\Insurance\InsuranceTables::POLICIES . ".provider,billing.id,billing.billed," . "billing.authorized,form_encounter.last_level_billed,billing.x12_partner_id,billing.user";
                         $TPSCriteriaDataTypeMaster = "datetime,datetime,datetime,radio,text_like," . "text,include,text,radio,radio,radio," . "radio_like,radio,query_drop_down,text";
                     } else {
                         $TPSCriteriaDisplayMaster = [
@@ -680,7 +680,7 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                             xl("Last Level Billed"),
                             xl("X12 Partner")
                         ];
-                        $TPSCriteriaKeyMaster = "form_encounter.date,billing.date,claims.process_time,claims.target,patient_data.fname," . "form_encounter.pid,claims.payer_id,form_encounter.encounter,insurance_data.provider,billing.id,billing.billed," . "billing.authorized,form_encounter.last_level_billed,billing.x12_partner_id";
+                        $TPSCriteriaKeyMaster = "form_encounter.date,billing.date,claims.process_time,claims.target,patient_data.fname," . "form_encounter.pid,claims.payer_id,form_encounter.encounter," . \OpenEMR\Services\Insurance\InsuranceTables::POLICIES . ".provider,billing.id,billing.billed," . "billing.authorized,form_encounter.last_level_billed,billing.x12_partner_id";
                         $TPSCriteriaDataTypeMaster = "datetime,datetime,datetime,radio,text_like," . "text,include,text,radio,radio,radio," . "radio_like,radio,query_drop_down";
                     }
                         // The below section is needed if there is any 'radio' or 'radio_like' type in the $TPSCriteriaDataTypeMaster
@@ -1035,17 +1035,8 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                                 // Check if patient has primary insurance and a subscriber exists for it.
                                 // If not we will highlight their name in red.
                                 // TBD: more checking here.
-                                $res = sqlQuery(
-                                    "SELECT count(*) AS count FROM insurance_data WHERE " .
-                                    "pid = ? AND " .
-                                    "type='primary' AND " .
-                                    "subscriber_lname IS NOT NULL AND " .
-                                    "subscriber_lname != '' LIMIT 1",
-                                    [
-                                    $iter['enc_pid']
-                                    ]
-                                );
-                                $namecolor = ($res['count'] > 0) ? "black" : "#ff7777";
+                                $res = \OpenEMR\Services\Insurance\PolicyRecords::countPrimaryWithSubscriber($iter['enc_pid']);
+                                $namecolor = (is_array($res) && $res['count'] > 0) ? "black" : "#ff7777";
 
                                 $bgcolor = (($encount & 1) ? "var(--light)" : "var(--gray300)");
                                 echo "<tr style='background-color: " . attr($bgcolor) . ";'><td colspan='" . attr($colCount) . "' height='5'></td></tr>\n";
@@ -1152,8 +1143,9 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                                     $insuranceCount = count($effective_insurances ?? []);
 
                                     foreach ($effective_insurances as $key => $row) {
-                                        $insuranceName = sqlQuery("SELECT `name` FROM `insurance_companies` WHERE `id` = ?", [$row['provider']])['name'];
-                                        $x12Partner = sqlQuery("SELECT `x12_default_partner_id` FROM `insurance_companies` WHERE `id` = ?", [$row['provider']])['x12_default_partner_id'];
+                                        $payerRow = \OpenEMR\Services\InsuranceCompanyService::columnsOf($row['provider'], '`name`, `x12_default_partner_id`');
+                                        $insuranceName = is_array($payerRow) ? $payerRow['name'] : null;
+                                        $x12Partner = is_array($payerRow) ? $payerRow['x12_default_partner_id'] : null;
                                         $lhtml .= "<option value=\"" . attr(substr((string) $row['type'], 0, 1) . $row['provider']) . "\"";
                                         // Twin (insurance-reference): preselect the level after the last one closed, by
                                         // level. Master compared the list position with the level closed, which held only
@@ -1206,24 +1198,7 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                                     $lastcrow = false;
 
                                     while ($crow = sqlFetchArray($cres)) {
-                                        $query = "SELECT id.type, ic.name " .
-                                            "FROM insurance_data AS id, insurance_companies AS ic WHERE " .
-                                            "id.pid = ? AND " .
-                                            "id.provider = ? AND " .
-                                            "(id.date <= ? OR id.date IS NULL) AND " .
-                                            "(id.date_end >= ? OR id.date_end IS NULL) AND " .
-                                            "ic.id = id.provider " .
-                                            "ORDER BY id.type ASC, id.date DESC";
-
-                                        $irow = sqlQuery(
-                                            $query,
-                                            [
-                                            $iter['enc_pid'],
-                                            $crow['payer_id'],
-                                            $raw_encounter_date,
-                                            $raw_encounter_date
-                                            ]
-                                        );
+                                        $irow = \OpenEMR\Services\Insurance\PolicyRecords::levelAndPayerNameOn($iter['enc_pid'], $crow['payer_id'], $raw_encounter_date);
 
                                         if ($crow['bill_process']) {
                                                 $lhtml .= "<br />\n&nbsp;" . text(oeFormatShortDate(substr((string) $crow['bill_time'], 0, 10))) . text(substr((string) $crow['bill_time'], 10, 6)) . " " . xlt("Queued for") . " " . text($irow['type'] ?? '') . " " . text($crow['target'] ?? '') . " " . xlt("billing to ") . text($irow['name'] ?? '');

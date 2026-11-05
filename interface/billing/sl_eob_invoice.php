@@ -508,7 +508,7 @@ $bnrow = sqlQuery("select billing_note from form_encounter where pid = ? AND enc
                         for ($i = 1; $i <= 3; ++$i) {
                             $payerid = SLEOB::arGetPayerID($patient_id, $svcdate, $i);
                             if ($payerid) {
-                                $tmp = sqlQuery("SELECT name FROM insurance_companies WHERE id = ?", [$payerid]);
+                                $tmp = \OpenEMR\Services\InsuranceCompanyService::columnsOf($payerid, 'name');
                                 $name = $tmp['name'] ?? '';
                                 $payer_names[$i] = is_string($name) ? $name : '';
                                 echo text("$i: " . $payer_names[$i]) . "<br />";

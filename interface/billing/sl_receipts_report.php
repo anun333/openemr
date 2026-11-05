@@ -612,9 +612,8 @@ $form_facility   = $_POST['form_facility'] ?? null;
                         // Get insurance company name
                             $insconame = '';
                             if ($form_proc_codefull  && $row['project_id']) {
-                                $tmp = sqlQuery("SELECT name FROM insurance_companies WHERE " .
-                                "id = ?", [$row['project_id']]);
-                                $insconame = $tmp['name'];
+                                $tmp = \OpenEMR\Services\InsuranceCompanyService::columnsOf($row['project_id'], 'name');
+                                $insconame = is_array($tmp) ? $tmp['name'] : null;
                             }
 
                             $amount1 = 0;

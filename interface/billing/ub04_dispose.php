@@ -133,8 +133,8 @@ function ub04_dispose(): void
 
 function get_payer_defaults($payerid)
 {
-    $p = sqlQuery("SELECT insurance_companies.* FROM insurance_companies WHERE insurance_companies.id = ?", [$payerid]);
-    if ($p['claim_template']) {
+    $p = \OpenEMR\Services\InsuranceCompanyService::columnsOf($payerid);
+    if (is_array($p) && $p['claim_template']) {
         return $p['claim_template'];
     } else {
         return json_encode([]);
@@ -144,10 +144,7 @@ function get_payer_defaults($payerid)
 function savePayerTemplate($payerid, $ub04id): void
 {
     $ub04id = json_encode($ub04id);
-    sqlStatement("update insurance_companies set claim_template = ? where id = ?", [
-        $ub04id,
-        $payerid
-    ]);
+    \OpenEMR\Services\InsuranceCompanyService::setClaimTemplate($payerid, $ub04id);
 }
 
 function saveTemplate($encounter, $pid, $ub04id, $action = 'form'): void

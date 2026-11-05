@@ -120,11 +120,7 @@ class InvoiceSummary
         }
         // Get insurance data for stuff
         $ins_data = [];
-        $res = sqlStatement("SELECT insurance_data.type as type, insurance_companies.name as name " .
-            "FROM insurance_data " .
-            "INNER JOIN insurance_companies ON insurance_data.provider = insurance_companies.id " .
-            "WHERE insurance_data.pid = ?", [$patient_id]);
-        while ($row = sqlFetchArray($res)) {
+        foreach (\OpenEMR\Services\Insurance\PolicyRecords::levelsAndPayerNames($patient_id) as $row) {
             $ins_data[$row['type']] = $row['name'];
         }
         // Get payments and adjustments. (includes copays)
@@ -132,13 +128,18 @@ class InvoiceSummary
             "a.code_type, a.code, a.modifier, a.memo, a.payer_type, a.adj_amount, a.pay_amount, a.reason_code, " .
             "a.post_time, a.session_id, a.sequence_no, a.account_code, a.follow_up_note, " .
             "s.payer_id, s.reference, s.check_date, s.deposit_date, s.payment_method " .
-            ",i.name " .
             "FROM ar_activity AS a " .
             "LEFT OUTER JOIN ar_session AS s ON s.session_id = a.session_id " .
-            "LEFT OUTER JOIN insurance_companies AS i ON i.id = s.payer_id " .
             "WHERE a.deleted IS NULL AND a.pid = ? AND a.encounter = ? " .
             "ORDER BY s.check_date, a.sequence_no", [$patient_id, $encounter_id]);
+        $activityRows = [];
         while ($row = sqlFetchArray($res)) {
+            $activityRows[] = $row;
+        }
+        // The payer's name, as the company join gave it: the session's payer_id's company, or none.
+        $payerNames = \OpenEMR\Services\InsuranceCompanyService::namesOf(array_column($activityRows, 'payer_id'));
+        foreach ($activityRows as $row) {
+            $row['name'] = \OpenEMR\Services\InsuranceCompanyService::nameFrom($payerNames, $row['payer_id']);
             $code = $row['code'];
             if (!$code) {
                 $code = $row['account_code'] == "PCP" ? "Copay" : "Claim level";

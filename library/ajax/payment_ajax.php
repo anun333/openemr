@@ -46,9 +46,7 @@ function AjaxDropDownCode(): void
 			<td colspan='3' align='center'><a id='anchor_insurance_code_" . attr($CountIndex) . "' href='#'></a></td>
 	  </tr>";
         $insurance_text_ajax = trim(($_POST['insurance_text_ajax'] ?? ''));
-        $res = sqlStatement("SELECT insurance_companies.id,name,city,state,country FROM insurance_companies
-			left join addresses on insurance_companies.id=addresses.foreign_id  where name like ? or  insurance_companies.id like ? ORDER BY name", [$insurance_text_ajax . '%', $insurance_text_ajax . '%']);
-        while ($row = sqlFetchArray($res)) {
+        foreach (\OpenEMR\Services\InsuranceCompanyService::searchByNameOrIdPrefix($insurance_text_ajax) as $row) {
             $bgcolor = $CountIndex % 2 == 1 ? '#ddddff' : '#ffdddd';
 
                 $CountIndex++;
