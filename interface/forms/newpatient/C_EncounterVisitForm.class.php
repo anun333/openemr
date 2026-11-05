@@ -31,6 +31,7 @@ use OpenEMR\Common\Acl\AclExtended;
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\DateRange;
 use OpenEMR\Common\Dates\InForce;
 use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Session\SessionWrapperFactory;
@@ -453,15 +454,16 @@ class C_EncounterVisitForm
     {
         $duplicate = ['isDuplicate' => false];
         if (!$viewmode) {
-            // Search for an encounter from today
+            // Search for an encounter from today (the site's day, the whole of it)
+            $siteToday = (new SiteClock())->today();
+            $today = DateRange::days('fe.date', $siteToday, $siteToday);
             $erow = sqlQuery("SELECT fe.encounter, fe.date " .
                 "FROM form_encounter AS fe, forms AS f WHERE " .
                 "fe.pid = ? " .
-                " AND fe.date >= ? " .
-                " AND fe.date <= ? " .
+                " AND " . $today->sql . " " .
                 " AND " .
                 "f.formdir = 'newpatient' AND f.form_id = fe.id AND f.deleted = 0 " .
-                "ORDER BY fe.encounter DESC LIMIT 1", [$pid, date('Y-m-d 00:00:00'), date('Y-m-d 23:59:59')]);
+                "ORDER BY fe.encounter DESC LIMIT 1", [$pid, ...$today->binds]);
 
             if (!empty($erow['encounter'])) {
                 $duplicate = ['isDuplicate' => true, 'encounter' => $erow['encounter'], 'date' => oeFormatShortDate(substr((string) $erow['date'], 0, 10))];

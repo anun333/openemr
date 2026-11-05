@@ -1205,7 +1205,7 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                 // Render the Prescriptions card if turned on
                 if ($rx === 1) :
                     if (OEGlobalsBag::getInstance()->getBoolean('erx_enable') && ($display_current_medications_below ?? '') == 1) {
-                        $sql = "SELECT * FROM prescriptions WHERE patient_id = ? AND active = '1'";
+                        $sql = "SELECT * FROM prescriptions WHERE patient_id = ? AND " . InForce::prescriptionNotWithdrawnSql();
                         $res = sqlStatement($sql, [$pid]);
 
                         $rxArr = [];

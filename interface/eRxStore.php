@@ -577,10 +577,7 @@ class eRxStore
 			WHERE pid = ?
 				AND type = \'allergy\'
 				AND title = ?
-				AND (
-					enddate IS NULL
-					OR enddate = \'0000-00-00\'
-				);',
+				AND ' . InForce::issueHasNoEndSql() . ';',
             [
                 $patientId,
                 $name
@@ -706,10 +703,7 @@ class eRxStore
 			WHERE pid = ?
 				AND type = \'allergy\'
 				AND erx_source = \'1\'
-				AND (
-					enddate IS NULL
-						OR enddate = \'0000-00-00\'
-				);',
+				AND ' . InForce::issueHasNoEndSql() . ';',
             [$patientId]
         );
     }

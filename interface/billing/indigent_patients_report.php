@@ -187,8 +187,9 @@ if (!empty($_POST['form_refresh'])) {
     $sqlBindArray = [];
 
     if ($form_start_date) {
-        $where .= " AND e.date >= ?";
-        array_push($sqlBindArray, $form_start_date);
+        $fromDay = \OpenEMR\Common\Dates\DateRange::from('e.date', $form_start_date);
+        $where .= " AND " . $fromDay->sql;
+        array_push($sqlBindArray, ...$fromDay->binds);
     }
 
     if ($form_end_date) {

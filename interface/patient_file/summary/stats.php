@@ -105,7 +105,7 @@ function getListData($pid, $type): array
 
 function getPrescriptions($pid): array
 {
-    $sql = "SELECT * FROM prescriptions WHERE patient_id = ? AND active = '1'";
+    $sql = "SELECT * FROM prescriptions WHERE patient_id = ? AND " . InForce::prescriptionNotWithdrawnSql();
     $res = sqlStatement($sql, [$pid]);
     $rx = [];
     while ($row = sqlFetchArray($res)) {
@@ -154,7 +154,7 @@ foreach ($ISSUE_TYPES as $key => $arr) {
         $display_current_medications_below = 0;
 
         if (OEGlobalsBag::getInstance()->getBoolean('erx_enable')) {
-            $res = sqlStatement("SELECT * FROM prescriptions WHERE patient_id=? AND active='1'", [$pid]);
+            $res = sqlStatement("SELECT * FROM prescriptions WHERE patient_id=? AND " . InForce::prescriptionNotWithdrawnSql(), [$pid]);
             $list = [];
             $rxArr = [];
             while ($row = sqlFetchArray($res)) {

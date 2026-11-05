@@ -2961,8 +2961,8 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
 {
     // HR: used only for filters, not targets
 
-    // Set date to current if not set
-    $dateTarget = $dateTarget ?: date('Y-m-d H:i:s');
+    // Set date to current if not set (the site's clock)
+    $dateTarget = $dateTarget ?: (new SiteClock())->now()->format('Y-m-d H:i:s');
     // The issue must be in force at the target (not withdrawn, not ended: a zero end is no end) and have begun by it;
     // the target is bound as given, as before.
 
@@ -2988,7 +2988,7 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
                 "WHERE `type`=? " .
                 "AND `pid`=? " .
                 "AND `title` $sqloper " .
-                "AND ( (`begdate` IS NULL AND `date`<=?) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) " .
+                "AND " . InForce::issueBegunOrEnteredSql() . " " .
                 "AND " . InForce::issueSql(), [$type,$patient_id,$code,$dateTarget,$dateTarget,...InForce::issueBindsStored($dateTarget)]);
             if (!empty($response)) {
                 return true;
@@ -2999,7 +2999,7 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
                 "WHERE `type`=? " .
                 "AND `pid`=? " .
                 "AND `diagnosis` LIKE ? " .
-                "AND ( (`begdate` IS NULL AND `date`<=?) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) " .
+                "AND " . InForce::issueBegunOrEnteredSql() . " " .
                 "AND " . InForce::issueSql(), [$type,$patient_id,"%" . $code_type . ":" . $code . "%",$dateTarget,$dateTarget,...InForce::issueBindsStored($dateTarget)]);
             if (!empty($response)) {
                 return true;
@@ -3021,7 +3021,7 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
             "WHERE `type`=? " .
             "AND `pid`=? " .
             "AND `title` $sqloper " .
-            "AND ( (`begdate` IS NULL AND `date`<=?) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) " .
+            "AND " . InForce::issueBegunOrEnteredSql() . " " .
             "AND " . InForce::issueSql(), [$type,$patient_id,$value,$dateTarget,$dateTarget,...InForce::issueBindsStored($dateTarget)]);
         if (!empty($response)) {
             return true;

@@ -248,8 +248,8 @@ class PrescriptionService extends BaseService
                             ,meds.medication_adherence
                             ,meds.medication_adherence_information_source
                             ,CASE
-                                WHEN prescriptions.active = '1' AND " . InForce::prescriptionNotEndedSqlOn('prescriptions', $clock->today()) . " THEN 'active'
-                                WHEN prescriptions.active = '1' THEN 'completed'
+                                WHEN " . InForce::prescriptionSqlOn('prescriptions', $clock->today()) . " THEN 'active'
+                                WHEN " . InForce::prescriptionNotWithdrawnSql('prescriptions') . " THEN 'completed'
                                 ELSE 'stopped'
                             END as 'status'
                             ,prescriptions.dosage

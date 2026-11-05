@@ -54,7 +54,7 @@ function update_issues($pid, $encounter, $diags): void
     $sqlUpdateIssueDescription = "UPDATE lists SET title=?, modifydate=NOW() WHERE id=? AND TITLE!=?";
 
     $sqlFindProblem = "SELECT id, title FROM lists WHERE ";
-    $sqlFindProblem .= " ( (`begdate` IS NULL) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) AND " ;
+    $sqlFindProblem .= InForce::issueBegunSql() . " AND " ;
     array_push($lists_params, $target_date);
     // in force on the visit's date (not withdrawn, not ended: a zero end is no end), as issue_diagnoses() lists it
     $sqlFindProblem .= InForce::issueSql() . " ";
@@ -242,7 +242,7 @@ function issue_diagnoses($pid, $encounter): array
           " LEFT JOIN issue_encounter as ie ON ie.list_id=l.id AND ie.encounter=?" .
           " WHERE l.type='medical_problem'" .
           " AND l.pid=?" . // 1st parameter pid
-          " AND ( (l.begdate IS NULL) OR (l.begdate IS NOT NULL AND l.begdate<=?) ) AND " .
+          " AND " . InForce::issueBegunSql('l') . " AND " .
           InForce::issueSql('l') .
           " ORDER BY ie.encounter DESC,l.id";
     $results = sqlStatement($sql, $parameters);

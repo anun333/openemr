@@ -1663,7 +1663,7 @@ class EncounterccdadispatchTable
                        left join list_options as l3 on l3.option_id=route AND l3.list_id = ?
                        left join list_options as l4 on l4.option_id=`interval` AND l4.list_id = ?
                        left join users as u on u.id = l.provider_id
-                       where l.patient_id = ? and l.active = 1";
+                       where l.patient_id = ? and " . InForce::prescriptionNotWithdrawnSql('l');
         $res = QueryUtils::fetchRecords($query, ['drug_units', 'drug_form', 'drug_route', 'drug_interval', $pid]);
         $today = (new SiteClock())->today();
 

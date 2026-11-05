@@ -103,8 +103,9 @@ if (!empty($_POST['form_get_hl7']) && ($_POST['form_get_hl7'] === 'true')) {
   "c.reportable=1 and " .
   "l.id not in (select lists_id from syndromic_surveillance) and ";
 if (!empty($from_date)) {
-    $query .= "l.date >= ? " ;
-    array_push($sqlBindArray, $from_date);
+    $fromDay = \OpenEMR\Common\Dates\DateRange::from('l.date', $from_date);
+    $query .= $fromDay->sql . " " ;
+    array_push($sqlBindArray, ...$fromDay->binds);
 }
 
 if (!empty($from_date) && !empty($to_date)) {
