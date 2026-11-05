@@ -656,7 +656,6 @@ if (!empty($_POST['form_refresh'])) {
                     // 'ar_session' is not capturing payer_id when entering payments through invoice or era posting
                     // Twin (insurance-reference): the policy at that level in force on the date of
                     // service (master: getOneByPid(), key order: an undated row, else the oldest).
-                    $insurance_id = [];
                     if (in_array((int)$row['payer_type'], [1, 2, 3], true)) {
                         $insurance_id = ['provider' => (new InsuranceService())->getEffectiveInsuranceAt(
                             (int)$row['pid'],
