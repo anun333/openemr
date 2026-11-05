@@ -173,7 +173,11 @@ function default_gen_hl7_order(int $orderid): Hl7OrderResult
 
     // NTE segment(s).
     //$msql = sqlStatement("SELECT title FROM lists WHERE type='medication' AND pid='".$porow['pid']."'");
-    $msql = sqlStatement("SELECT drug FROM prescriptions WHERE active=1 AND patient_id=?", [$porow['pid']]);
+    // the prescriptions in force today: active, and not past their end date
+    $msql = sqlStatement(
+        "SELECT drug FROM prescriptions WHERE " . \OpenEMR\Common\Dates\InForce::prescriptionSql() . " AND patient_id=?",
+        [...\OpenEMR\Common\Dates\InForce::prescriptionBinds((new \OpenEMR\Common\Dates\SiteClock())->today()), $porow['pid']]
+    );
     $drugs = [];
     while ($mres = sqlFetchArray($msql)) {
         $drugs[] = trim((string) $mres['drug']);

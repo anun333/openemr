@@ -20,6 +20,8 @@ require_once(\OpenEMR\Core\OEGlobalsBag::getInstance()->get('fileroot') . "/libr
 
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Forms\FormActionBarSettings;
 use OpenEMR\Common\Http\oeHttp;
 use OpenEMR\Common\Session\SessionWrapperFactory;
@@ -190,7 +192,11 @@ class C_Prescription extends Controller
             } else {
                 //   Grab medication list from prescriptions list and load into array
                 $pid = OEGlobalsBag::getInstance()->get('pid');
-                $medList = sqlStatement("SELECT drug FROM prescriptions WHERE active = 1 AND patient_id = ?", [$pid]);
+                // the prescriptions in force today: active, and not past their end date
+                $medList = sqlStatement(
+                    "SELECT drug FROM prescriptions WHERE " . InForce::prescriptionSql() . " AND patient_id = ?",
+                    [...InForce::prescriptionBinds((new SiteClock())->today()), $pid]
+                );
                 // escape_table_name() on a literal handles case-insensitive table name matching.
                 $tbl_rxnconso = escape_table_name('RXNCONSO');
                 $nameList = [];

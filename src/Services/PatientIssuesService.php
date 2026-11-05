@@ -12,15 +12,13 @@
 namespace OpenEMR\Services;
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Events\Services\ServiceSaveEvent;
-use OpenEMR\Services\Search\CompositeSearchField;
-use OpenEMR\Services\Search\DateSearchField;
 use OpenEMR\Services\Search\FhirSearchWhereClauseBuilder;
-use OpenEMR\Services\Search\SearchModifier;
 use OpenEMR\Services\Search\TokenSearchField;
-use OpenEMR\Services\Search\TokenSearchValue;
 use OpenEMR\Services\Traits\ServiceEventTrait;
 use OpenEMR\Validators\ProcessingResult;
 
@@ -88,15 +86,14 @@ class PatientIssuesService extends BaseService
 
     public function getActiveIssues(int $pid): ProcessingResult
     {
-        $notEnded = new TokenSearchField('enddate', [new TokenSearchValue(null)]);
-        $notEnded->setModifier(SearchModifier::MISSING);
-        $futureEndDate = new DateSearchField('enddate', ['gt' . date(DATE_ATOM)]);
-        $isActive = new CompositeSearchField('active_issues', [], false);
-        $isActive->addChild($notEnded);
-        $isActive->addChild($futureEndDate);
-        // values are string for TokenSearchField
+        // The patient's issues in force now: not withdrawn (activity 0), not ended (a future end is current, a zero
+        // end is no end). The rule is checked on the rows, as InForce reads them.
         $patientByPid = new TokenSearchField('pid', [(string)$pid]);
-        return $this->search(['active_issues' => $isActive, 'pid' => $patientByPid]);
+        $result = $this->search(['pid' => $patientByPid]);
+        $now = (new SiteClock())->now();
+        $data = $result->getData();
+        $result->setData(array_values(array_filter(is_array($data) ? $data : [], fn($row): bool => is_array($row) && InForce::issue($row, $now))));
+        return $result;
     }
 
     public function updateIssue($issueRecord)
