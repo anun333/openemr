@@ -206,7 +206,10 @@ function universal_gen_hl7_order(int $orderid): Hl7OrderResult
   // Insurance stuff.
     $ins_type = trim((string) $porow['billing_type']);
     // Twin (insurance-reference): DEFAULT 1 (#15038), the collection date, else the order date.
-    $payers = universal_loadPayerInfo($porow['pid'], \OpenEMR\Services\Insurance\CoverageDay::forLabOrder($porow['date_collected'] ?? null, $porow['date_ordered'], \OpenEMR\Services\Insurance\CoverageDay::today())->format('Y-m-d'));
+    $payers = universal_loadPayerInfo($porow['pid'], (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
+        is_string($porow['date_collected'] ?? null) ? $porow['date_collected'] : null,
+        is_string($porow['date_ordered'] ?? null) ? $porow['date_ordered'] : null
+    )->format('Y-m-d'));
     $setid = 0;
     if ($ins_type == 'T') {
         // only send primary and secondary insurance

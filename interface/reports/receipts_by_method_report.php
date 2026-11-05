@@ -658,11 +658,12 @@ if (!empty($_POST['form_refresh'])) {
                     // service (master: getOneByPid(), key order: an undated row, else the oldest).
                     $insurance_id = [];
                     if (in_array((int)$row['payer_type'], [1, 2, 3], true)) {
-                        $insurance_id = ['provider' => (new InsuranceService())->getCompanyAtLevelOn(
+                        $insurance_id = ['provider' => (new InsuranceService())->getEffectiveInsuranceAt(
                             (int)$row['pid'],
-                            (int)$row['payer_type'],
-                            \OpenEMR\Services\Insurance\CoverageDay::forVisit($row['date'], \OpenEMR\Services\Insurance\CoverageDay::today())
-                        )];
+                            [1 => \OpenEMR\Services\Insurance\InsuranceLevel::Primary, 2 => \OpenEMR\Services\Insurance\InsuranceLevel::Secondary,
+                                3 => \OpenEMR\Services\Insurance\InsuranceLevel::Tertiary][(int)$row['payer_type']],
+                            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($row['date']) ? $row['date'] : null)
+                        )?->companyId];
                     } elseif ($row['payer_type'] == '0') {
                         $rowmethod = xl('Personal pay');
                         $rowreference = trim((string) $row['reference']);
