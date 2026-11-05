@@ -1620,7 +1620,7 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                                                 // Twin (insurance-reference): the copay of the primary in force on the visit date.
                                                 $primaryNow = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
                                                     is_numeric($fs->pid) ? (int)$fs->pid : 0,
-                                                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($fs->visit_date) ? $fs->visit_date : null)
+                                                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($fs->visit_date)
                                                 )[0] ?? null;
                                                 $visitCopay = $primaryNow?->policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary
                                                     ? ($primaryNow->columns['copay'] ?? 0) : 0;

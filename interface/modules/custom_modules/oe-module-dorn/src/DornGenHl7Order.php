@@ -84,8 +84,8 @@ class DornGenHl7Order extends GenHl7OrderBase
         $collected = is_array($porow) ? ($porow['date_collected'] ?? null) : null;
         $ordered = is_array($porow) ? ($porow['date_ordered'] ?? null) : null;
         $labDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
-            is_string($collected) ? $collected : null,
-            is_string($ordered) ? $ordered : null
+            $collected,
+            $ordered
         )->format('Y-m-d');
         $payers = $this->loadPayerInfo($porow['pid'], $labDay);
         $setid = 0;

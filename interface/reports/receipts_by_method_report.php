@@ -662,7 +662,7 @@ if (!empty($_POST['form_refresh'])) {
                         $insurance_id = ['provider' => (new InsuranceService())->getEffectiveInsuranceAt(
                             is_numeric($row['pid']) ? (int)$row['pid'] : 0,
                             $payerLevel,
-                            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($row['date']) ? $row['date'] : null)
+                            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($row['date'])
                         )?->companyId];
                     } elseif ($row['payer_type'] == '0') {
                         $rowmethod = xl('Personal pay');
