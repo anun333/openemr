@@ -202,7 +202,16 @@ function PrintCreditDetail($detail, $pat, $unassigned = false, $effectiveInsuran
         if (empty($pmt['payer_type'])) {
             $payer = xl('Patient');
         } else {
-            $payerId = $effectiveInsurances[$pmt['payer_type'] - 1]['provider'];
+            // Twin (insurance-reference): the policy at the payment's level, by level. Master took the list
+            // position payer_type - 1, which held only while getEffectiveInsurances() stopped at the first
+            // level with nothing in force.
+            $payerId = null;
+            $paymentLevel = [1 => 'primary', 2 => 'secondary', 3 => 'tertiary'][(int)$pmt['payer_type']] ?? '';
+            foreach ($effectiveInsurances as $effectiveInsurance) {
+                if (($effectiveInsurance['type'] ?? '') === $paymentLevel) {
+                    $payerId = $effectiveInsurance['provider'];
+                }
+            }
             $payer = sqlQuery("SELECT `name` FROM `insurance_companies` WHERE `id` = ?", [$payerId])['name'];
         }
         $pmt_date = $unassigned ? substr((string) $pmt['post_to_date'], 0, 10) : substr((string) $pmt['post_time'], 0, 10);

@@ -213,24 +213,25 @@ final class InsuranceServiceEffectiveInsurancesTest extends TestCase
                 [['primary', '101', '2020-01-01', null], ['secondary', '102', '2027-01-01', null]],
                 $current, $current, $current,
             ],
-            // The old function stops at the first level with nothing in force.
-            'an ended primary and a current secondary (the old function differs)' => [
+            // Twin (insurance-reference): the old function is a wrapper over the service, so it no longer
+            // stops at the first level with nothing in force.
+            'an ended primary and a current secondary' => [
                 [['primary', '101', '2020-01-01', '2026-07-07'], ['secondary', '104', '2020-01-01', null]],
-                ['secondary 104'], ['secondary 104'], [],
+                ['secondary 104'], ['secondary 104'], ['secondary 104'],
             ],
-            'a blank primary and a current secondary (the old function differs)' => [
+            'a blank primary and a current secondary' => [
                 [['primary', '', null, null], ['secondary', '104', '2020-01-01', null]],
-                ['secondary 104'], ['secondary 104'], [],
+                ['secondary 104'], ['secondary 104'], ['secondary 104'],
             ],
-            'an ended secondary between a primary and a tertiary (the old function differs)' => [
+            'an ended secondary between a primary and a tertiary' => [
                 [['primary', '101', '2020-01-01', null], ['secondary', '102', '2020-01-01', '2026-01-01'], ['tertiary', '103', '2020-01-01', null]],
-                ['primary 101', 'tertiary 103'], ['primary 101', 'tertiary 103'], ['primary 101'],
+                ['primary 101', 'tertiary 103'], ['primary 101', 'tertiary 103'], ['primary 101', 'tertiary 103'],
             ],
-            // sql_mode = '' stores a mistyped date as 0000-00-00. The claim and the old function compare it
-            // as a day in year 0, so the policy has ended; the service reads it as no end.
-            'a zero end date (the claim and the old function differ)' => [
+            // sql_mode = '' stores a mistyped date as 0000-00-00. The service reads it as no end; on the twin
+            // the claim and the old function read the service.
+            'a zero end date' => [
                 [['primary', '101', '2020-01-01', '0000-00-00']],
-                $current, [], [],
+                $current, $current, $current,
             ],
         ];
     }
@@ -266,7 +267,7 @@ final class InsuranceServiceEffectiveInsurancesTest extends TestCase
         $this->addPolicy('primary', '102', null, null);
 
         self::assertSame(['primary 102'], $this->serviceChoice(self::DAY));
-        self::assertContains($this->claimChoice(self::DAY), [['primary 101'], ['primary 102']]);
+        self::assertSame(['primary 102'], $this->claimChoice(self::DAY), 'twin: the claim reads the service');
     }
 
     #[Test]
