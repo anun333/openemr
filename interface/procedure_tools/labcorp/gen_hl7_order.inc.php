@@ -40,6 +40,7 @@ use OpenEMR\Common\Logging\EventAuditLogger;
 use OpenEMR\Common\Orders\Hl7OrderGenerationException;
 use OpenEMR\Common\Orders\Hl7OrderResult;
 use OpenEMR\Common\Session\SessionWrapperFactory;
+use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Services\Insurance\CoverageDay;
 use OpenEMR\Services\InsuranceService;
 
@@ -93,10 +94,11 @@ function labcorp_loadPayerInfo($pid, $date = ''): array
     // the day, so an ended plan is not billed and an undated one is; keyed by
     // level, so a current secondary behind an ended primary goes out as the
     // secondary (IN1-22, the requisition's secondary fields).
-    $day = CoverageDay::forVisit($date, CoverageDay::today());
+    $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
     $payers = [];
-    foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $drow) {
-        $ins = $drow->policy->level->number() - 1;
+    foreach ((new InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $day) as $effective) {
+        $drow = $effective->columns;
+        $ins = $effective->policy->level->number() - 1;
         $crow = sqlQuery(
             "SELECT * FROM insurance_companies WHERE id = ?",
             [$drow['provider']]
@@ -115,10 +117,10 @@ function loadGuarantorInfo($pid, $date = ''): array
     // Twin (insurance-reference): the first policy in force on the day (the
     // primary when there is one), where master took the latest-starting row
     // of the first level, ended or not.
-    $day = CoverageDay::forVisit($date, CoverageDay::today());
+    $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
     $guarantors = [];
-    foreach (array_slice((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day), 0, 1) as $drow) {
-        $guarantors[] = ['data' => $drow];
+    foreach (array_slice((new InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $day), 0, 1) as $effective) {
+        $guarantors[] = ['data' => $effective->columns];
     }
     return $guarantors;
 }
@@ -327,7 +329,11 @@ function labcorp_gen_hl7_order(int $orderid): Hl7OrderResult
     $P[30] = hl7Text($porow['docnpi']);
     $P[71] = hl7Text($porow['docnpi']);
         // Insurance stuff.
-    $labDay = CoverageDay::forLabOrder($porow['date_collected'], $porow['date_ordered'], CoverageDay::today())->format('Y-m-d');
+    // Twin (insurance-reference): DEFAULT 1 (#15038), the collection date, else the order date.
+    $labDay = (new CoverageDay(ServiceContainer::getClock()))->forLabOrder(
+        is_string($porow['date_collected'] ?? null) ? $porow['date_collected'] : null,
+        is_string($porow['date_ordered'] ?? null) ? $porow['date_ordered'] : null
+    )->format('Y-m-d');
     $payers = labcorp_loadPayerInfo($porow['pid'], $labDay);
     $setid = 0;
     if ($bill_type == 'T') {

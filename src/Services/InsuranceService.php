@@ -27,6 +27,7 @@ use OpenEMR\Services\Insurance\CoverageSegment;
 use OpenEMR\Services\Insurance\EffectiveInsurance;
 use OpenEMR\Services\Insurance\EffectiveInsuranceRow;
 use OpenEMR\Services\Insurance\EffectiveInsuranceRule;
+use OpenEMR\Services\Insurance\InsuranceLevel;
 use OpenEMR\Services\Search\{
     CompositeSearchField,
     DateSearchField,
@@ -589,6 +590,20 @@ class InsuranceService extends BaseService
     public function getCoverageSegments(int $pid, InsuranceLevel $level, DateTimeImmutable $from, DateTimeImmutable $to): array
     {
         return EffectiveInsuranceRule::segments($this->getRuleRowsByPid([$pid])[$pid] ?? [], $level, $from, $to);
+    }
+
+    /**
+     * The policy in force at one level on a day, or null when the level has
+     * none, as getEffectiveInsurances() chooses it.
+     */
+    public function getEffectiveInsuranceAt(int $pid, InsuranceLevel $level, DateTimeImmutable $day): ?EffectiveInsurance
+    {
+        foreach ($this->getEffectiveInsurances($pid, $day) as $policy) {
+            if ($policy->level === $level) {
+                return $policy;
+            }
+        }
+        return null;
     }
 
     public function swapInsurance($pid, string $targetType, string $insuranceUuid): ProcessingResult

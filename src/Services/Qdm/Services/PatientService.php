@@ -64,6 +64,9 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
         return $sql;
     }
 
+    private const ALWAYS = '1000-01-01';
+    private const OPEN = '9999-12-31';
+
     /** @var array<int, ?string> the Source of Payment Typology code by company id */
     private static array $payerCodes = [];
 
@@ -172,10 +175,23 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
         // (DEFAULT 4, #15038: every primary, each with its own start and stop; the CQL keeps those that
         // overlap the measurement period). Master joined every primary row and kept the last fetched,
         // with no stop. A patient with no primary keeps master's single payer with no code.
-        $segments = (new \OpenEMR\Services\InsuranceService())->getCoverageSegments((int)$record['pid'], \OpenEMR\Services\Insurance\InsuranceLevel::Primary);
+        // Every day the rule can answer: a run that reaches the range's first day began "always" (a blank
+        // start), one that reaches its last day is open.
+        $always = new \DateTimeImmutable(self::ALWAYS);
+        $open = new \DateTimeImmutable(self::OPEN);
+        $segments = (new \OpenEMR\Services\InsuranceService())->getCoverageSegments(
+            (int)$record['pid'],
+            \OpenEMR\Services\Insurance\InsuranceLevel::Primary,
+            $always,
+            $open
+        );
         $periods = [];
         foreach ($segments as $segment) {
-            $periods[] = [$segment->from?->format('Y-m-d'), $segment->to?->format('Y-m-d'), self::payerCode($segment->policy->companyId)];
+            $periods[] = [
+                $segment->from == $always ? null : $segment->from->format('Y-m-d'),
+                $segment->to == $open ? null : $segment->to->format('Y-m-d'),
+                self::payerCode($segment->policy->companyId),
+            ];
         }
         if ($periods === []) {
             $periods[] = [null, null, null];

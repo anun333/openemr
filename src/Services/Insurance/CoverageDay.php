@@ -61,4 +61,13 @@ final readonly class CoverageDay
     {
         return self::fromStored($encounterDate);
     }
+
+    /**
+     * Screens and documents that show current coverage: today, the clock's
+     * calendar day, at midnight in PHP's default time zone.
+     */
+    public function today(): DateTimeImmutable
+    {
+        return new DateTimeImmutable($this->clock->now()->format('Y-m-d'));
+    }
 }

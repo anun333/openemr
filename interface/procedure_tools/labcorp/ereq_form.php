@@ -405,9 +405,13 @@ STYLES;
         // Twin (insurance-reference): the primary in force on the lab day (DEFAULT 1, #15038:
         // collection date, else order date), as the HL7 IN1 sends it; id is the company's, as before.
         $primary = [];
-        $labDay = \OpenEMR\Services\Insurance\CoverageDay::forLabOrder($procedure['date_collected'] ?? null, $procedure['date_ordered'] ?? null, \OpenEMR\Services\Insurance\CoverageDay::today());
-        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows((int)$pid, $labDay) as $policyRow) {
-            if ($policyRow['type'] === 'primary') {
+        $labDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
+            is_string($procedure['date_collected'] ?? null) ? $procedure['date_collected'] : null,
+            is_string($procedure['date_ordered'] ?? null) ? $procedure['date_ordered'] : null
+        );
+        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $labDay) as $effective) {
+            $policyRow = $effective->columns;
+            if ($effective->policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary) {
                 $company = sqlQuery("SELECT name, id FROM insurance_companies WHERE id = ?", [$policyRow['provider']]);
                 $primary = array_merge($policyRow, is_array($company) ? $company : []);
             }
