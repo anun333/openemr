@@ -656,11 +656,12 @@ if (!empty($_POST['form_refresh'])) {
                     // 'ar_session' is not capturing payer_id when entering payments through invoice or era posting
                     // Twin (insurance-reference): the policy at that level in force on the date of
                     // service (master: getOneByPid(), key order: an undated row, else the oldest).
-                    if (in_array((int)$row['payer_type'], [1, 2, 3], true)) {
+                    $payerLevel = [1 => \OpenEMR\Services\Insurance\InsuranceLevel::Primary, 2 => \OpenEMR\Services\Insurance\InsuranceLevel::Secondary,
+                        3 => \OpenEMR\Services\Insurance\InsuranceLevel::Tertiary][is_numeric($row['payer_type']) ? (int)$row['payer_type'] : 0] ?? null;
+                    if ($payerLevel !== null) {
                         $insurance_id = ['provider' => (new InsuranceService())->getEffectiveInsuranceAt(
-                            (int)$row['pid'],
-                            [1 => \OpenEMR\Services\Insurance\InsuranceLevel::Primary, 2 => \OpenEMR\Services\Insurance\InsuranceLevel::Secondary,
-                                3 => \OpenEMR\Services\Insurance\InsuranceLevel::Tertiary][(int)$row['payer_type']],
+                            is_numeric($row['pid']) ? (int)$row['pid'] : 0,
+                            $payerLevel,
                             (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($row['date']) ? $row['date'] : null)
                         )?->companyId];
                     } elseif ($row['payer_type'] == '0') {

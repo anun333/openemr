@@ -4949,7 +4949,7 @@ class EncounterccdadispatchTable
             // Twin (insurance-reference): the policy in force on the document's date (a CCD: today),
             // through the coverage service; a company without an address row or a phone is kept.
             $policyId = null;
-            foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances((int)$pid, (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->today()) as $policy) {
+            foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(is_numeric($pid) ? (int)$pid : 0, (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->today()) as $policy) {
                 if ($policy->level->value === $type) {
                     $policyId = $policy->id;
                 }

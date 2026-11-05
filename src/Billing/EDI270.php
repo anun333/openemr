@@ -421,7 +421,12 @@ class EDI270
                 'subscriber_relationship' => $i['subscriber_relationship'], 'subscriber_lname' => $i['subscriber_lname'],
                 'subscriber_fname' => $i['subscriber_fname'], 'subscriber_mname' => $i['subscriber_mname'],
                 'subscriber_dob' => $ymd($i['subscriber_DOB']), 'subscriber_sex' => $i['subscriber_sex'], 'date' => $ymd($i['date']),
-            ], is_array($c) ? $c : []);
+            ]);
+            foreach (is_array($c) ? $c : [] as $key => $value) {
+                if (is_string($key)) {
+                    $out[$key] = $value;
+                }
+            }
         }
         return $out;
     }
@@ -454,7 +459,7 @@ class EDI270
         $resArray = [];
         while ($row = sqlFetchArray($res)) {
             // Twin (insurance-reference): the primary in force today (a real-time check has no appointment).
-            $resArray[] = array_merge($row, self::coverageColumns((int)$row['pid'], self::eligibilityDay(null, null)));
+            $resArray[] = array_merge($row, self::coverageColumns(is_numeric($row['pid']) ? (int)$row['pid'] : 0, self::eligibilityDay(null, null)));
         }
         $details = self::requestRealTimeEligible($resArray, '', "~", ':', true);
         if ($details === false) {
