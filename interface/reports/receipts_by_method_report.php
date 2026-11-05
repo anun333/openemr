@@ -588,12 +588,11 @@ if (!empty($_POST['form_refresh'])) {
         $sqlBindArray = [];
         $query = "SELECT a.pid, a.encounter, a.post_time, a.pay_amount, " .
           "a.adj_amount, a.memo, a.session_id, a.code, a.payer_type, fe.id, fe.date, fe.provider_id, fe.id, " .
-          "fe.invoice_refno, s.deposit_date, s.payer_id, s.reference, s.payment_method, i.name " .
+          "fe.invoice_refno, s.deposit_date, s.payer_id, s.reference, s.payment_method " .
           "FROM ar_activity AS a " .
           "JOIN form_encounter AS fe ON fe.pid = a.pid AND fe.encounter = a.encounter " .
           "JOIN forms AS f ON f.pid = a.pid AND f.encounter = a.encounter AND f.formdir = 'newpatient' " .
           "LEFT JOIN ar_session AS s ON s.session_id = a.session_id " .
-          "LEFT JOIN insurance_companies AS i ON i.id = s.payer_id " .
           "LEFT OUTER JOIN billing AS b ON b.pid = a.pid AND b.encounter = a.encounter AND " .
           "b.code = a.code AND b.modifier = a.modifier AND b.activity = 1 AND " .
           "b.code_type != 'COPAY' AND b.code_type != 'TAX' " .
@@ -640,7 +639,14 @@ if (!empty($_POST['form_refresh'])) {
 
         //
         $res = sqlStatement($query, $sqlBindArray);
-        while ($row = sqlFetchArray($res)) {
+        $receiptRows = [];
+        while ($receiptRow = sqlFetchArray($res)) {
+            $receiptRows[] = $receiptRow;
+        }
+        // The session payer's name, as the company join gave it.
+        $receiptPayerNames = \OpenEMR\Services\InsuranceCompanyService::namesOf(array_column($receiptRows, 'payer_id'));
+        foreach ($receiptRows as $row) {
+            $row['name'] = \OpenEMR\Services\InsuranceCompanyService::nameFrom($receiptPayerNames, $row['payer_id']);
             if ($form_use_edate) {
                 $thedate = substr((string) $row['date'], 0, 10);
             } elseif (!empty($row['deposit_date'])) {

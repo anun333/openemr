@@ -228,9 +228,7 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
     $query = "SELECT " .
     "p.fname, p.mname, p.lname, p.street, p.city, p.state, " .
     "p.postal_code, p.phone_home, p.phone_biz, p.pid, p.pubpid, " .
-    "count(e.date) AS ecount, max(e.date) AS edate, " .
-    "i1.date AS idate1, i2.date AS idate2, " .
-    "c1.name AS cname1, c2.name AS cname2 " .
+    "count(e.date) AS ecount, max(e.date) AS edate " .
     "FROM patient_data AS p ";
     if (!empty($from_date)) {
         $query .= "JOIN form_encounter AS e ON " .
@@ -253,17 +251,11 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
         }
     }
 
+    // The primary and secondary joins this list once had selected nothing it shows: they only repeated each
+    // patient's row, and the loop below keeps a patient's first row.
     $query .=
-    "LEFT OUTER JOIN insurance_data AS i1 ON " .
-    "i1.pid = p.pid AND i1.type = 'primary' " .
-    "LEFT OUTER JOIN insurance_companies AS c1 ON " .
-    "c1.id = i1.provider " .
-    "LEFT OUTER JOIN insurance_data AS i2 ON " .
-    "i2.pid = p.pid AND i2.type = 'secondary' " .
-    "LEFT OUTER JOIN insurance_companies AS c2 ON " .
-    "c2.id = i2.provider " .
-    "GROUP BY p.lname, p.fname, p.mname, p.pid, i1.date, i2.date " .
-    "ORDER BY p.lname, p.fname, p.mname, p.pid, i1.date DESC, i2.date DESC";
+    "GROUP BY p.lname, p.fname, p.mname, p.pid " .
+    "ORDER BY p.lname, p.fname, p.mname, p.pid";
     $res = sqlStatement($query, $sqlArrayBind);
 
     $prevpid = 0;

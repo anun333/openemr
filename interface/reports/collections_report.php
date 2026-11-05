@@ -317,8 +317,8 @@ function endInsurance($insrow): void
 
 function getInsName($payerid)
 {
-    $tmp = sqlQuery("SELECT name FROM insurance_companies WHERE id = ? ", [$payerid]);
-    return $tmp['name'];
+    $tmp = \OpenEMR\Services\InsuranceCompanyService::columnsOf($payerid, 'name');
+    return is_array($tmp) ? $tmp['name'] : null;
 }
 
 $ins_co_name = '';

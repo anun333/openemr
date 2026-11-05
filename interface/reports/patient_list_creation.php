@@ -605,7 +605,7 @@ if (!empty($_POST['form_refresh'])) {
                     . "IF(pd.hipaa_mail = 'YES', 'Mail Message', 'NO') , IF(pd.hipaa_voice = 'YES', 'Voice Message', 'NO') ), ', NO', ''), 'NO,', '') AS communications";
             break;
         case "insurers":
-            $sqlstmt .= ", id.type AS ins_type, id.provider AS ins_provider, ic.name AS ins_name";
+            $sqlstmt .= ", id.type AS ins_type, id.provider AS ins_provider, id.name AS ins_name";
             break;
         case "encounts":
             $sqlstmt .= ", enc.date AS other_date, "
@@ -674,8 +674,8 @@ if (!empty($_POST['form_refresh'])) {
             $sqlstmt .= "'";
             break;
         case "insurers":
-            $sqlstmt .= " LEFT OUTER JOIN insurance_data AS id ON id.pid = pd.pid "
-                    . "LEFT OUTER JOIN insurance_companies AS ic ON ic.id = id.provider";
+            // each policy with its company's name, through the coverage service (an outer join, as before)
+            $sqlstmt .= " LEFT OUTER JOIN " . \OpenEMR\Services\Insurance\PolicySql::sqlPoliciesWithPayerName('id') . " ON id.pid = pd.pid";
             break;
         case "encounts":
             $sqlstmt .= " LEFT OUTER JOIN form_encounter AS enc ON pd.pid = enc.pid "
@@ -725,7 +725,7 @@ if (!empty($_POST['form_refresh'])) {
             array_push($sqlBindArray, $sql_date_from, $sql_date_to, date("Y-m-d H:i:s"));
             break;
         case "insurers":
-            $whr_stmt .= " AND id.type = 'primary' AND ic.name != '' AND pd.date >= ? AND pd.date < DATE_ADD(?, INTERVAL 1 DAY) AND pd.date <= ?";
+            $whr_stmt .= " AND id.type = 'primary' AND id.name != '' AND pd.date >= ? AND pd.date < DATE_ADD(?, INTERVAL 1 DAY) AND pd.date <= ?";
             array_push($sqlBindArray, $sql_date_from, $sql_date_to, date("Y-m-d H:i:s"));
             break;
         case "encounts":

@@ -211,28 +211,55 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_labels'])) {
     $query = "SELECT " .
     "p.pid, p.fname, p.mname, p.lname, p.DOB, p.sex, p.ethnoracial, " .
     "p.street, p.city, p.state, p.postal_code, " .
-    "count(e.date) AS ecount, max(e.date) AS edate, " .
-    "i1.date AS idate1, i2.date AS idate2, " .
-    "c1.name AS cname1, c2.name AS cname2 " .
+    "count(e.date) AS ecount, max(e.date) AS edate " .
     "FROM patient_data AS p " .
     "JOIN form_encounter AS e ON " .
     "e.pid = p.pid AND " .
     "e.date >= ? AND " .
     "e.date <= ? " .
-    "LEFT OUTER JOIN insurance_data AS i1 ON " .
-    "i1.pid = p.pid AND i1.type = 'primary' " .
-    "LEFT OUTER JOIN insurance_companies AS c1 ON " .
-    "c1.id = i1.provider " .
-    "LEFT OUTER JOIN insurance_data AS i2 ON " .
-    "i2.pid = p.pid AND i2.type = 'secondary' " .
-    "LEFT OUTER JOIN insurance_companies AS c2 ON " .
-    "c2.id = i2.provider " .
-    "GROUP BY p.lname, p.fname, p.mname, p.pid, i1.date, i2.date " .
-    "ORDER BY p.lname, p.fname, p.mname, p.pid, i1.date DESC, i2.date DESC";
+    "GROUP BY p.lname, p.fname, p.mname, p.pid " .
+    "ORDER BY p.lname, p.fname, p.mname, p.pid";
     $res = sqlStatement($query, [$form_from_date . ' 00:00:00', $form_to_date . ' 23:59:59']);
+    $seenRows = [];
+    while ($seenRow = sqlFetchArray($res)) {
+        $seenRows[] = $seenRow;
+    }
+    // What the primary and secondary joins gave each patient's first row: the policies at the level with the
+    // latest start (a missing start last), the first of them by id for the company's name, and the encounter
+    // count multiplied by how many policies share that start (each one repeated the visits).
+    $seenPolicies = [];
+    foreach (['primary', 'secondary'] as $seenType) {
+        foreach (\OpenEMR\Services\Insurance\PolicyRecords::forPatientsAtLevel(array_column($seenRows, 'pid'), $seenType) as $seenPolicy) {
+            if (is_int($seenPolicy['pid']) || is_string($seenPolicy['pid'])) {
+                $seenPolicies[$seenType][$seenPolicy['pid']][] = $seenPolicy; // by start (none first), then id
+            }
+        }
+    }
 
     $prevpid = 0;
-    while ($row = sqlFetchArray($res)) {
+    foreach ($seenRows as $row) {
+        $seenCount = is_numeric($row['ecount']) ? (int)$row['ecount'] : 0;
+        foreach (['primary' => 1, 'secondary' => 2] as $seenType => $seenN) {
+            $seenList = is_int($row['pid']) || is_string($row['pid']) ? ($seenPolicies[$seenType][$row['pid']] ?? []) : [];
+            $seenLatest = null;
+            foreach ($seenList as $seenPolicy) {
+                if ($seenPolicy['date'] !== null && ($seenLatest === null || $seenPolicy['date'] > $seenLatest)) {
+                    $seenLatest = $seenPolicy['date'];
+                }
+            }
+            $seenName = null;
+            $seenSize = 0;
+            foreach ($seenList as $seenPolicy) {
+                if ($seenPolicy['date'] === $seenLatest) {
+                    $seenName = $seenSize === 0 ? $seenPolicy['company_name'] : $seenName;
+                    $seenSize++;
+                }
+            }
+            $row["idate$seenN"] = $seenLatest;
+            $row["cname$seenN"] = $seenName;
+            $seenCount *= max(1, $seenSize);
+        }
+        $row['ecount'] = (string)$seenCount;
         if ($row['pid'] == $prevpid) {
             continue;
         }
