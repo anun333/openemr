@@ -105,9 +105,9 @@ class SyndromicsurveillanceTable
 				lists_id
 			FROM
 				syndromic_surveillance)
-			AND l.date >= ? AND l.date <= ? AND l.pid = p.pid ";
-        $query_string[] = $fromDate;
-        $query_string[] = $toDate;
+			AND " . \OpenEMR\Common\Dates\DateRange::between('l.date', $fromDate, $toDate)->sql . " AND l.pid = p.pid ";
+        // through the last day: issues recorded on it after midnight are in the range
+        array_push($query_string, ...\OpenEMR\Common\Dates\DateRange::between('l.date', $fromDate, $toDate)->binds);
 
         if ($code_selected) {
             $codeIds = is_array($code_selected) ? array_map(static fn ($v): int => (int) $v, $code_selected) : [];
@@ -146,9 +146,10 @@ class SyndromicsurveillanceTable
             $query_string[] = $provider_selected;
         }
 
-        $query      .= " AND fe.date >= ? AND fe.date <= ?";
-        $query_string[] = $fromDate;
-        $query_string[] = $toDate;
+        // through the last day: the last day's visits are in the range
+        $onDays = \OpenEMR\Common\Dates\DateRange::between('fe.date', $fromDate, $toDate);
+        $query      .= " AND " . $onDays->sql;
+        array_push($query_string, ...$onDays->binds);
 
         if ($get_count) {
             $result = QueryUtils::fetchRecords($query, $query_string);
@@ -198,9 +199,9 @@ class SyndromicsurveillanceTable
 			  lists_id
 			FROM
 			  syndromic_surveillance)
-			AND l.date >= ? AND l.date <= ? AND l.pid = p.pid ";
-        $query_string[] = $fromDate;
-        $query_string[] = $toDate;
+			AND " . \OpenEMR\Common\Dates\DateRange::between('l.date', $fromDate, $toDate)->sql . " AND l.pid = p.pid ";
+        // through the last day: issues recorded on it after midnight are in the range
+        array_push($query_string, ...\OpenEMR\Common\Dates\DateRange::between('l.date', $fromDate, $toDate)->binds);
 
         if ($code_selected) {
             $codeIds = is_array($code_selected) ? array_map(static fn ($v): int => (int) $v, $code_selected) : [];
@@ -243,9 +244,10 @@ class SyndromicsurveillanceTable
             $query_string[] = $provider_selected;
         }
 
-        $query      .= " AND fe.date >= ? AND fe.date <= ?";
-        $query_string[] = $fromDate;
-        $query_string[] = $toDate;
+        // through the last day: the last day's visits are in the range
+        $onDays = \OpenEMR\Common\Dates\DateRange::between('fe.date', $fromDate, $toDate);
+        $query      .= " AND " . $onDays->sql;
+        array_push($query_string, ...$onDays->binds);
 
         $content = '';
 

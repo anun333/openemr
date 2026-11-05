@@ -186,15 +186,17 @@ if (!empty($_POST['form_csvexport'])) {
     <?php
 } // end not export
 if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
+    // through the last day: visits carry a time, so the last day's visits are in the range
+    $toDay = \OpenEMR\Common\Dates\DateRange::through('fe.date', $form_to_date);
     $query = "SELECT b.pid, b.encounter, SUM(b.fee) AS charges, " .
     "MAX(fe.date) AS date " .
     "FROM form_encounter AS fe, billing AS b " .
-    "WHERE fe.date >= ? AND fe.date <= ? " .
+    "WHERE fe.date >= ? AND " . $toDay->sql . " " .
     "AND b.pid = fe.pid AND b.encounter = fe.encounter " .
     "AND b.code_type != 'COPAY' AND b.activity > 0 AND b.fee != 0 " .
     "GROUP BY b.pid, b.encounter ORDER BY b.pid, b.encounter";
 
-    $res = sqlStatement($query, [(!empty($form_from_date)) ? $form_from_date : '0000-00-00', $form_to_date]);
+    $res = sqlStatement($query, [(!empty($form_from_date)) ? $form_from_date : '0000-00-00', ...$toDay->binds]);
     $insarr = [];
     $prev_pid = 0;
     $patcount = 0;

@@ -53,14 +53,15 @@ class EncountermanagerTable
             $query .= " AND (cf.encounter IS  NULL OR cf.encounter ='')";
         }
         if ($data['from_date'] && $data['to_date']) {
+            // through the last day: the last day's patients and visits are in the range
             if ($data['search_type_date'] == 'date_patient_creation') {
-                $query .= " AND pd.date BETWEEN ? AND ? ";
+                $onDays = \OpenEMR\Common\Dates\DateRange::between('pd.date', $data['from_date'], $data['to_date']);
             } else {
                 // default is encounter date
-                $query .= " AND fe.date BETWEEN ? AND ? ";
+                $onDays = \OpenEMR\Common\Dates\DateRange::between('fe.date', $data['from_date'], $data['to_date']);
             }
-            $query_data[] = $data['from_date'];
-            $query_data[] = $data['to_date'];
+            $query .= " AND " . $onDays->sql . " ";
+            array_push($query_data, ...$onDays->binds);
         }
         if (!empty($data['provider_id'])) {
             $query .= " AND (`fe`.`provider_id` = ? OR `fe`.`supervisor_id` = ?) ";

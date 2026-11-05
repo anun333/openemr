@@ -245,12 +245,14 @@ function allProcPat(?string $proc_type = null, $patient_id = null, $from_date = 
 function allVitalsPat($patient_id, $from_date, $to_date): array
 {
     $vitArr = [];
+    // the period's last day whole: vitals taken on it after midnight are in it
+    $inPeriod = \OpenEMR\Common\Dates\DateRange::between('v.date', $from_date, $to_date);
     $vitQry = "SELECT fe.encounter, v.bps, v.date,v.bpd,v.BMI as bmi FROM form_encounter fe " .
             "INNER JOIN forms f ON f.encounter = fe.encounter AND f.deleted != 1 AND f.formdir = 'vitals' " .
             "INNER JOIN form_vitals v ON v.id = f.form_id " .
             "WHERE v.pid = ? " .
-            "AND (v.date BETWEEN ? AND ?)";
-    $vitRes = sqlStatement($vitQry, [$patient_id, $from_date, $to_date]);
+            "AND (" . $inPeriod->sql . ")";
+    $vitRes = sqlStatement($vitQry, [$patient_id, ...$inPeriod->binds]);
     while ($vitRow = sqlFetchArray($vitRes)) {
         $vitArr[] = $vitRow;
     }
@@ -261,10 +263,12 @@ function allVitalsPat($patient_id, $from_date, $to_date): array
 function allImmuPat($patient_id, $from_date, $to_date): array
 {
     $immArr = [];
+    // the period's last day whole: shots given on it after midnight are in it
+    $inPeriod = \OpenEMR\Common\Dates\DateRange::between('administered_date', $from_date, $to_date);
     $immQry =   "SELECT * FROM immunizations " .
             "WHERE patient_id = ? " .
-            "AND (administered_date BETWEEN ? AND ?)";
-    $immRes = sqlStatement($immQry, [$patient_id, $from_date, $to_date]);
+            "AND (" . $inPeriod->sql . ")";
+    $immRes = sqlStatement($immQry, [$patient_id, ...$inPeriod->binds]);
     while ($immRow = sqlFetchArray($immRes)) {
         $immArr[] = $immRow;
     }

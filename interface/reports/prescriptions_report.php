@@ -218,9 +218,11 @@ if (!empty($_POST['form_refresh'])) {
     if ($_POST['form_refresh']) {
         $sqlBindArray = [];
 
+        // through the last day: a prescription changed on it after midnight is in the range
+        $toDay = \OpenEMR\Common\Dates\DateRange::through('r.date_modified', $form_to_date);
         $where = "r.date_modified >= ? AND " .
-        "r.date_modified <= ?";
-        array_push($sqlBindArray, $form_from_date, $form_to_date);
+        $toDay->sql;
+        array_push($sqlBindArray, $form_from_date, ...$toDay->binds);
 
         if ($form_patient_id) {
             $where .= " AND p.pubpid = ?";

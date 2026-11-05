@@ -112,8 +112,10 @@ if (!empty($from_date) && !empty($to_date)) {
 }
 
 if (!empty($to_date)) {
-    $query .= "l.date <= ? ";
-    array_push($sqlBindArray, $to_date);
+    // through the last day: an issue recorded on it after midnight is in the range
+    $toDay = \OpenEMR\Common\Dates\DateRange::through('l.date', $to_date);
+    $query .= $toDay->sql . " ";
+    array_push($sqlBindArray, ...$toDay->binds);
 }
 
 if (!empty($from_date) || !empty($to_date)) {

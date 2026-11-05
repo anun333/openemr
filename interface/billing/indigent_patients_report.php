@@ -192,8 +192,10 @@ if (!empty($_POST['form_refresh'])) {
     }
 
     if ($form_end_date) {
-        $where .= " AND e.date <= ?";
-        array_push($sqlBindArray, $form_end_date);
+        // through the last day: the last day's visits are in the range
+        $toDay = \OpenEMR\Common\Dates\DateRange::through('e.date', $form_end_date);
+        $where .= " AND " . $toDay->sql;
+        array_push($sqlBindArray, ...$toDay->binds);
     }
 
     $rez = sqlStatement("SELECT " .
