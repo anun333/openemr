@@ -42,6 +42,8 @@ require_once(__DIR__ . "/../../../library/appointments.inc.php");
 
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Forms\FormRegistry;
 use OpenEMR\Common\Http\CurrentRequest;
 use OpenEMR\Common\Session\PatientSessionUtil;
@@ -1119,14 +1121,16 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                 $col .= "col-md-" . $colInt;
 
                 /**
-                 * Helper function to return only issues with an outcome not equal to resolved
+                 * Helper function to return only issues in force now (not withdrawn, not ended: a zero end
+                 * date is no end) with an outcome not equal to resolved
                  *
                  * @param array $i An array of issues
                  * @return array
                  */
                 function filterActiveIssues(array $i): array
                 {
-                    return array_filter($i, fn($_i): bool => ($_i['outcome'] != 1) && (empty($_i['enddate']) || (strtotime((string) $_i['enddate']) > strtotime('now'))));
+                    $now = (new SiteClock())->now();
+                    return array_filter($i, fn($_i): bool => is_array($_i) && ($_i['outcome'] != 1) && InForce::issue($_i, $now));
                 }
 
                 // ALLERGY CARD

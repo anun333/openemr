@@ -22,6 +22,8 @@ require_once \OpenEMR\Core\OEGlobalsBag::getInstance()->getProjectDir() . '/cust
 use OpenEMR\Common\Acl\AccessDeniedHelper;
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Lists\IssueTypeRegistry;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\Header;
@@ -98,13 +100,13 @@ function ActiveIssueCodeRecycleFn($thispid2, $ISSUE_TYPES2): void
 
     $pe2 = [$thispid2];
     $qs2 = str_repeat('?, ', count($modeIssueTypes) - 1) . '?';
-    $sqlParameters2 = array_merge($pe2, $modeIssueTypes);
 
     $codeList2 = [];
 
+    // the codes of the issues in force now (not withdrawn, not ended: a zero end is no end)
     $issueCodes2 = sqlStatement(
-        "SELECT diagnosis FROM lists WHERE pid = ? AND enddate is NULL AND type IN ($qs2)",
-        $sqlParameters2
+        "SELECT diagnosis FROM lists WHERE pid = ? AND " . InForce::issueSql() . " AND type IN ($qs2)",
+        [...$pe2, ...InForce::issueBinds((new SiteClock())->now()), ...$modeIssueTypes]
     );
 
     while ($issueCodesRow2 = sqlFetchArray($issueCodes2)) {

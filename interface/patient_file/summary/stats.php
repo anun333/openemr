@@ -19,6 +19,8 @@ require_once($srcdir . "/options.inc.php");
 use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Lists\IssueTypeRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 
@@ -42,12 +44,12 @@ function getListData($pid, $type): array
             "LEFT JOIN ( SELECT id AS lists_medication_id, list_id, drug_dosage_instructions FROM lists_medication )",
             "medications ON medications.list_id = id",
             "WHERE pid = ? AND type = ? AND",
-            dateEmptySql('enddate')
+            InForce::issueSql('lists')
         ];
     } else {
         $sqlArr = [
             "SELECT * FROM lists WHERE pid = ? AND type = ? AND",
-            dateEmptySql('enddate')
+            InForce::issueSql('lists')
         ];
     }
 
@@ -63,7 +65,8 @@ function getListData($pid, $type): array
     $sqlArr[] = "ORDER BY begdate";
 
     $sql = implode(" ", $sqlArr);
-    $res = sqlStatement($sql, [$pid, $type]);
+    // In force now: not withdrawn (activity 0) and not ended, a future end date included.
+    $res = sqlStatement($sql, [$pid, $type, ...InForce::issueBinds((new SiteClock())->now())]);
     $list = [];
 
     while ($row = sqlFetchArray($res)) {
@@ -187,11 +190,11 @@ foreach ($ISSUE_TYPES as $key => $arr) {
         if (OEGlobalsBag::getInstance()->getBoolean('erx_enable') && $key == "medication") {
             $sqlUploadedArr = [
                 "SELECT * FROM lists WHERE pid = ? AND type = 'medication' AND",
-                dateEmptySql('enddate'),
+                InForce::issueSql('lists'),
                 "AND erx_uploaded != '1' ORDER BY begdate",
             ];
             $sqlUploaded = implode(" ", $sqlUploadedArr);
-            $resUploaded = sqlStatement($sqlUploaded, [$pid]);
+            $resUploaded = sqlStatement($sqlUploaded, [$pid, ...InForce::issueBinds((new SiteClock())->now())]);
             if (sqlNumRows($resUploaded) == 0) {
                 $erx_upload_complete = 1;
                 continue;
@@ -313,10 +316,10 @@ endif; // End immunizations
 if ($erx_upload_complete == 1) {
     $sql = [
         "SELECT * FROM lists WHERE pid = ? AND type = 'medication' AND",
-        dateEmptySql('enddate'),
+        InForce::issueSql('lists'),
         "ORDER BY begdate"
     ];
-    $res = sqlStatement(implode(" ", $sql), [$pid]);
+    $res = sqlStatement(implode(" ", $sql), [$pid, ...InForce::issueBinds((new SiteClock())->now())]);
 
     $rxList = [];
     while ($row = sqlFetchArray($res)) {

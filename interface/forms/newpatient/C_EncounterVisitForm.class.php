@@ -31,6 +31,8 @@ use OpenEMR\Common\Acl\AclExtended;
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Common\Twig\TwigContainer;
 use OpenEMR\Common\Uuid\UuidRegistry;
@@ -288,9 +290,10 @@ class C_EncounterVisitForm
     {
 
         $issues = [];
+        // the issues in force now (not withdrawn, not ended: a future end is still current, a zero end is no end)
         $ires = sqlStatement("SELECT id, type, title, begdate FROM lists WHERE " .
-            "pid = ? AND enddate IS NULL " .
-            "ORDER BY type, begdate", [$pid]);
+            "pid = ? AND " . InForce::issueSql() . " " .
+            "ORDER BY type, begdate", [$pid, ...InForce::issueBinds((new SiteClock())->now())]);
 
         while ($irow = sqlFetchArray($ires)) {
             $tcode = $irow['type'];

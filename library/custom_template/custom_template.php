@@ -331,7 +331,8 @@ if ($isNN) {
                                 </li>
                                 <?php
                                 foreach ($ISSUE_TYPES as $issType => $issTypeDesc) {
-                                    $res = sqlStatement('SELECT title, id, IF(diagnosis="","",CONCAT(" [",diagnosis,"]")) codes FROM lists WHERE pid=? AND type=? AND enddate IS NULL ORDER BY title', [$pid, $issType]);
+                                    // the issues in force now (not withdrawn, not ended: a zero end is no end)
+                                    $res = sqlStatement('SELECT title, id, IF(diagnosis="","",CONCAT(" [",diagnosis,"]")) codes FROM lists WHERE pid=? AND type=? AND ' . \OpenEMR\Common\Dates\InForce::issueSql() . ' ORDER BY title', [$pid, $issType, ...\OpenEMR\Common\Dates\InForce::issueBinds((new \OpenEMR\Common\Dates\SiteClock())->now())]);
                                     if (sqlNumRows($res)) { ?>
                                     <li>
                                         <a class="collapsed"><?php echo htmlspecialchars(xl($issTypeDesc[0]), ENT_QUOTES); ?></a>

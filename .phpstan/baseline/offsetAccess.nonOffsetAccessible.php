@@ -20167,11 +20167,6 @@ $ignoreErrors[] = [
     'path' => __DIR__ . '/../../interface/patient_file/summary/demographics.php',
 ];
 $ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'enddate\' on mixed\\.$#',
-    'count' => 1,
-    'path' => __DIR__ . '/../../interface/patient_file/summary/demographics.php',
-];
-$ignoreErrors[] = [
     'message' => '#^Cannot access offset \'etitle\' on mixed\\.$#',
     'count' => 2,
     'path' => __DIR__ . '/../../interface/patient_file/summary/demographics.php',
@@ -20194,11 +20189,6 @@ $ignoreErrors[] = [
 $ignoreErrors[] = [
     'message' => '#^Cannot access offset \'jsEvent\' on mixed\\.$#',
     'count' => 2,
-    'path' => __DIR__ . '/../../interface/patient_file/summary/demographics.php',
-];
-$ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'outcome\' on mixed\\.$#',
-    'count' => 1,
     'path' => __DIR__ . '/../../interface/patient_file/summary/demographics.php',
 ];
 $ignoreErrors[] = [

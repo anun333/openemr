@@ -62,6 +62,8 @@ require_once(dirname(__DIR__) . "/custom/code_types.inc.php");
 use OpenEMR\BC\Utilities;
 use OpenEMR\Common\Acl\AclExtended;
 use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Forms\Types\BillingCodeType;
 use OpenEMR\Common\Forms\Types\LocalProviderListType;
 use OpenEMR\Common\Forms\Types\SmokingStatusType;
@@ -1196,10 +1198,10 @@ function generate_form_field($frow, $currvalue): void
     } elseif ($data_type == 24) { // the list of active allergies for the current patient
         // this is read-only!
         $query = "SELECT title, comments FROM lists WHERE " .
-        "pid = ? AND type = 'allergy' AND enddate IS NULL " .
+        "pid = ? AND type = 'allergy' AND " . InForce::issueSql() . " " .
         "ORDER BY begdate";
         // echo "<!-- $query -->\n"; // debugging
-        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid')]);
+        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid'), ...InForce::issueBinds((new SiteClock())->now())]);
         $count = 0;
         while ($lrow = sqlFetchArray($lres)) {
             if ($count++) {
@@ -2053,9 +2055,9 @@ function generate_print_field($frow, $currvalue, $value_allowed = true): void
     } elseif ($data_type == 24) { // the list of active allergies for the current patient
         // this is read-only!
         $query = "SELECT title, comments FROM lists WHERE " .
-        "pid = ? AND type = 'allergy' AND enddate IS NULL " .
+        "pid = ? AND type = 'allergy' AND " . InForce::issueSql() . " " .
         "ORDER BY begdate";
-        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid')]);
+        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid'), ...InForce::issueBinds((new SiteClock())->now())]);
         $count = 0;
         while ($lrow = sqlFetchArray($lres)) {
             if ($count++) {
@@ -2592,10 +2594,10 @@ function generate_display_field($frow, $currvalue): string
         $s .= "</table>";
     } elseif ($data_type == 24) { // the list of active allergies for the current patient
         $query = "SELECT title, comments FROM lists WHERE " .
-        "pid = ? AND type = 'allergy' AND enddate IS NULL " .
+        "pid = ? AND type = 'allergy' AND " . InForce::issueSql() . " " .
         "ORDER BY begdate";
         // echo "<!-- $query -->\n"; // debugging
-        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid')]);
+        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid'), ...InForce::issueBinds((new SiteClock())->now())]);
         $count = 0;
         while ($lrow = sqlFetchArray($lres)) {
             if ($count++) {
@@ -3042,9 +3044,9 @@ function generate_plaintext_field($frow, $currvalue)
         }
     } elseif ($data_type == 24) { // the list of active allergies for the current patient
         $query = "SELECT title, comments FROM lists WHERE " .
-        "pid = ? AND type = 'allergy' AND enddate IS NULL " .
+        "pid = ? AND type = 'allergy' AND " . InForce::issueSql() . " " .
         "ORDER BY begdate";
-        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid')]);
+        $lres = sqlStatement($query, [OEGlobalsBag::getInstance()->get('pid'), ...InForce::issueBinds((new SiteClock())->now())]);
         $count = 0;
         while ($lrow = sqlFetchArray($lres)) {
             if ($count++) {

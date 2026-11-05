@@ -22,6 +22,8 @@ namespace OpenEMR\Services\DocumentTemplates;
 use HTMLPurifier;
 use HTMLPurifier_Config;
 use OpenEMR\BC\ServiceContainer;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\PhoneNumberService;
@@ -621,9 +623,11 @@ class DocumentTemplateRender
     private function getIssues($type): string
     {
         $tmp = '';
-        $lres = sqlStatement("SELECT title, comments FROM lists WHERE " . "pid = ? AND type = ? AND enddate IS NULL " . "ORDER BY begdate", [
+        // the issues in force now (not withdrawn, not ended: a future end is still current, a zero end is no end)
+        $lres = sqlStatement("SELECT title, comments FROM lists WHERE " . "pid = ? AND type = ? AND " . InForce::issueSql() . " " . "ORDER BY begdate", [
             OEGlobalsBag::getInstance()->get('pid'),
-            $type
+            $type,
+            ...InForce::issueBinds((new SiteClock())->now()),
         ]);
         while ($lrow = sqlFetchArray($lres)) {
             if ($tmp) {

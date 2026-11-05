@@ -99,9 +99,10 @@ function dataFixup($data, $title = '')
 function getIssues($type): string
 {
     $tmp = '';
+    // the issues in force now (not withdrawn, not ended: a future end is still current, a zero end is no end)
     $lres = sqlStatement("SELECT title, comments FROM lists WHERE " .
-    "pid = ? AND type = ? AND enddate IS NULL " .
-    "ORDER BY begdate", [OEGlobalsBag::getInstance()->get('pid'), $type]);
+    "pid = ? AND type = ? AND " . \OpenEMR\Common\Dates\InForce::issueSql() . " " .
+    "ORDER BY begdate", [OEGlobalsBag::getInstance()->get('pid'), $type, ...\OpenEMR\Common\Dates\InForce::issueBinds((new \OpenEMR\Common\Dates\SiteClock())->now())]);
     while ($lrow = sqlFetchArray($lres)) {
         if ($tmp) {
             $tmp .= '; ';
