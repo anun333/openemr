@@ -95,16 +95,7 @@ if (
     $where = addwhere($where, 'p.number', $digits);
 }
 
-$query = "SELECT " .
-    "i.id, i.name, i.attn, " .
-    "a.line1, a.line2, a.city, a.state, a.zip, " .
-    "p.area_code, p.prefix, p.number " .
-    "FROM insurance_companies i " .
-    "LEFT JOIN addresses a ON a.foreign_id = i.id " .
-    "LEFT JOIN phone_numbers p ON p.foreign_id = i.id WHERE 1=1 ";
-
-$query .= $where . " ORDER BY i.name, a.zip";
-$res = sqlStatement($query);
+$res = \OpenEMR\Services\InsuranceCompanyService::searchForPractice(is_string($where) ? $where : '');
 ?>
 <html>
 <head>
@@ -167,10 +158,10 @@ td {
  </tr>
 
 <?php
-if (empty($res->_numOfRows)) {
+if ($res === []) {
     echo " <td>" . xlt('No matches found.') . "</td>";
 }
-while ($row = sqlFetchArray($res)) {
+foreach ($res as $row) {
     $anchor = "<a href=\"\" onclick=\"return setins(" .
     attr_js($row['id']) . "," . attr_js($row['name']) . ")\">";
     $phone = '&nbsp';

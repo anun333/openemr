@@ -58,7 +58,7 @@ class EhiExporter
 
     // A task's inputs and outputs are its children (task_input.task_id, task_output.task_id), so they are only
     // reached by following the task's child keys.
-    const PARENT_FK_TABLES_TRAVERSAL = ['patient_data', 'insurance_data', 'eligibility_verification', 'form_vitals'
+    const PARENT_FK_TABLES_TRAVERSAL = ['patient_data', \OpenEMR\Services\Insurance\InsuranceTables::POLICIES, 'eligibility_verification', 'form_vitals'
         , 'lbt_data',  'lbf_data', 'patient_tracker', 'documents', 'form_track_anything', 'contact', 'task'];
     /**
      * The task tables' references, stored as binary uuids: written to the CSV as uuid strings, as `uuid` is. Other

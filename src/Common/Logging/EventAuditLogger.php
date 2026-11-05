@@ -184,7 +184,7 @@ class EventAuditLogger implements AuditLoggerInterface
         "form_vitals" => EventCategory::PatientRecord,
         "history_data" => EventCategory::PatientRecord,
         "immunizations" => EventCategory::PatientRecord,
-        "insurance_data" => EventCategory::PatientRecord,
+        \OpenEMR\Services\Insurance\InsuranceTables::POLICIES => EventCategory::PatientRecord,
         "issue_encounter" => EventCategory::PatientRecord,
         "lists" => EventCategory::PatientRecord,
         "patient_data" => EventCategory::PatientRecord,
@@ -200,7 +200,7 @@ class EventAuditLogger implements AuditLoggerInterface
         "addresses" => EventCategory::SecurityAdministration,
         "phone_numbers" => EventCategory::SecurityAdministration,
         "x12_partners" => EventCategory::SecurityAdministration,
-        "insurance_companies" => EventCategory::SecurityAdministration,
+        \OpenEMR\Services\Insurance\InsuranceTables::PAYERS => EventCategory::SecurityAdministration,
         "codes" => EventCategory::SecurityAdministration,
         "registry" => EventCategory::SecurityAdministration,
         "users" => EventCategory::SecurityAdministration,
@@ -851,7 +851,7 @@ class EventAuditLogger implements AuditLoggerInterface
             return "Social and Family History";
         } elseif ($table == 'forms' || $table == 'form_encounter' || str_starts_with((string) $table, 'form_')) {
             return "Encounter Form";
-        } elseif ($table == 'insurance_data') {
+        } elseif ($table == \OpenEMR\Services\Insurance\InsuranceTables::POLICIES) {
             return "Patient Insurance";
         } elseif ($table == 'patient_data' || $table == 'employer_data') {
             return "Patient Demographics";

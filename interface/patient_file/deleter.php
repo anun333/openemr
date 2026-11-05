@@ -243,7 +243,7 @@ function popup_close() {
                 deleter_row_delete("transactions", "pid = ?", [$patient]);
                 deleter_row_delete("employer_data", "pid = ?", [$patient]);
                 deleter_row_delete("history_data", "pid = ?", [$patient]);
-                deleter_row_delete("insurance_data", "pid = ?", [$patient]);
+                deleter_row_delete(\OpenEMR\Services\Insurance\InsuranceTables::POLICIES, "pid = ?", [$patient]);
                 deleter_row_delete("patient_history", "pid = ?", [$patient]);
 
                 $res = QueryUtils::sqlStatementThrowException("SELECT * FROM forms WHERE pid = ?", [$patient]);

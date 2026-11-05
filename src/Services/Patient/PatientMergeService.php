@@ -53,7 +53,7 @@ class PatientMergeService
      * Tables that describe who the patient is. The target chart's copies are authoritative, so
      * the source's rows are deleted rather than repointed.
      */
-    private const IDENTITY_TABLES = ['patient_data', 'history_data', 'insurance_data'];
+    private const IDENTITY_TABLES = ['patient_data', 'history_data', \OpenEMR\Services\Insurance\InsuranceTables::POLICIES];
 
     /**
      * @param string $documentsDirectory Absolute path of the site's documents directory; each
@@ -309,7 +309,7 @@ class PatientMergeService
                 continue;
             }
 
-            if ($tableName === 'insurance_data') {
+            if ($tableName === \OpenEMR\Services\Insurance\InsuranceTables::POLICIES) {
                 $this->moveInsurance($sourcePid, $targetPid, $log);
             } elseif (in_array($tableName, self::IDENTITY_TABLES, true)) {
                 $this->deleteRows($tableName, 'pid', $sourcePid, $targetPid, $log);
@@ -427,21 +427,16 @@ class PatientMergeService
      */
     private function moveInsurance(int $sourcePid, int $targetPid, PatientMergeLog $log): void
     {
-        $count = $this->countRows('insurance_data', 'pid', $sourcePid);
+        $count = $this->countRows(\OpenEMR\Services\Insurance\InsuranceTables::POLICIES, 'pid', $sourcePid);
         if ($count === 0) {
             return;
         }
-        $log->add("UPDATE insurance_data (move the source's policies that don't collide, delete the rest) ($count)");
+        $log->add("UPDATE " . \OpenEMR\Services\Insurance\InsuranceTables::POLICIES . " (move the source's policies that don't collide, delete the rest) ($count)");
         if (!$this->production) {
             return;
         }
-        QueryUtils::sqlStatementThrowException(
-            "UPDATE `insurance_data` AS `s` LEFT JOIN `insurance_data` AS `t` ON `t`.`pid` = ? AND `t`.`type` = `s`.`type` AND `t`.`date` = `s`.`date`"
-            . " SET `s`.`pid` = ? WHERE `s`.`pid` = ? AND `t`.`id` IS NULL",
-            [$targetPid, $targetPid, $sourcePid]
-        );
-        QueryUtils::sqlStatementThrowException("DELETE FROM `insurance_data` WHERE `pid` = ?", [$sourcePid]);
-        $this->logMergeEvent($targetPid, 'update', "Moved the insurance_data rows of $sourcePid to $targetPid, where the target had none at that level and start");
+        \OpenEMR\Services\Insurance\PolicySave::moveForMerge($sourcePid, $targetPid);
+        $this->logMergeEvent($targetPid, 'update', "Moved the " . \OpenEMR\Services\Insurance\InsuranceTables::POLICIES . " rows of $sourcePid to $targetPid, where the target had none at that level and start");
     }
 
     /**

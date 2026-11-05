@@ -84,7 +84,7 @@ class InsuranceCompany extends ORDataObject
     public function __construct(public $id = "", ?InsuranceCompanyService $insuranceCompanyService = null)
     {
         $this->name = "";
-        $this->_table = "insurance_companies";
+        $this->_table = \OpenEMR\Services\Insurance\InsuranceTables::PAYERS;
         $this->address = new Address();
         if ($insuranceCompanyService === null) {
             $this->InsuranceCompany = new InsuranceCompanyService();
