@@ -1345,8 +1345,7 @@ function make_insurance() {
 
                                     //------------------------------------------------------------------------------------
                                     //NumberOfInsurance
-                                    $NumberOfInsurance = \OpenEMR\Common\Database\QueryUtils::fetchSingleValue("SELECT COUNT( DISTINCT TYPE ) NumberOfInsurance FROM `insurance_data`
-                                    where pid = ? and provider>0 ", 'NumberOfInsurance', [$pid]);
+                                    $NumberOfInsurance = \OpenEMR\Services\Insurance\PolicyRecords::countLevelsWithPayer($pid);
                                     $NumberOfInsurance = is_numeric($NumberOfInsurance) ? (int)$NumberOfInsurance : 0;
                                     // Twin (insurance-reference): rule 10. With no insurance level in force on the visit date the balance is
                                     // the patient's (master: only with none ever on file). The rest of master's test is kept: the number of

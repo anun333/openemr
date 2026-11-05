@@ -50,12 +50,11 @@ function portal_GetAllUnapplied($pat = '', $from_dt = '', $to_dt = ''): array
         return ($all);
     }
 
-    $sql = "SELECT ar_session.*, ins.name, " .
+    $sql = "SELECT ar_session.*, " .
         "pat.lname, pat.fname, pat.mname, " .
         "(SELECT SUM(ar_activity.pay_amount) FROM ar_activity WHERE " .
         "ar_activity.deleted IS NULL AND ar_activity.session_id = ar_session.session_id) AS applied " .
         "FROM ar_session " .
-        "LEFT JOIN insurance_companies AS ins on ar_session.payer_id = ins.id " .
         "LEFT JOIN patient_data AS pat on ar_session.patient_id = pat.pid " .
         "WHERE " .
         "ar_session.created_time >= ? AND ar_session.created_time <= ? " .
@@ -65,6 +64,11 @@ function portal_GetAllUnapplied($pat = '', $from_dt = '', $to_dt = ''): array
     while ($row = sqlFetchArray($result)) {
         $all[$iter] = $row;
         $iter++;
+    }
+    // The session payer's name, as the company join gave it.
+    $names = \OpenEMR\Services\InsuranceCompanyService::namesOf(array_column($all, 'payer_id'));
+    foreach ($all as $i => $row) {
+        $all[$i]['name'] = \OpenEMR\Services\InsuranceCompanyService::nameFrom($names, $row['payer_id']);
     }
 
     return ($all);
@@ -112,16 +116,20 @@ function portal_GetAllCredits($enc = '', $pat = ''): array
         return ($all);
     }
 
-    $sql = "SELECT activity.*, session.*, ins.name FROM ar_activity AS " .
+    $sql = "SELECT activity.*, session.* FROM ar_activity AS " .
         "activity LEFT JOIN ar_session AS session USING (session_id) " .
-        "LEFT JOIN insurance_companies AS ins ON session.payer_id = " .
-        "ins.id WHERE deleted IS NULL AND encounter = ? AND pid = ? " .
+        "WHERE deleted IS NULL AND encounter = ? AND pid = ? " .
         "ORDER BY sequence_no";
     $result = sqlStatement($sql, [$enc, $pat]);
     $iter = 0;
     while ($row = sqlFetchArray($result)) {
         $all[$iter] = $row;
         $iter++;
+    }
+    // The session payer's name, as the company join gave it.
+    $names = \OpenEMR\Services\InsuranceCompanyService::namesOf(array_column($all, 'payer_id'));
+    foreach ($all as $i => $row) {
+        $all[$i]['name'] = \OpenEMR\Services\InsuranceCompanyService::nameFrom($names, $row['payer_id']);
     }
 
     return ($all);
@@ -392,11 +400,9 @@ $form_to_date = fixDate($_REQUEST['form_to_date'], date('Y-m-d'));
             $sqlBindArray = [];
             $query = "select b.code_type, b.code, b.code_text, b.pid, b.provider_id, " .
             "b.billed, b.payer_id, b.units, b.fee, b.bill_date, b.id, " .
-            "ins.name, " .
             "fe.encounter, fe.date, fe.reason, fe.provider_id " .
             "FROM form_encounter AS fe " .
             "LEFT JOIN billing AS b ON b.pid=fe.pid AND b.encounter=fe.encounter " .
-            "LEFT JOIN insurance_companies AS ins ON b.payer_id = ins.id " .
             "LEFT OUTER JOIN code_types AS c ON c.ct_key = b.code_type " .
             "WHERE fe.date >= ? AND fe.date <= ? AND fe.pid = ? ";
             array_push($sqlBindArray, $from_date, $to_date, $pid);
@@ -404,6 +410,12 @@ $form_to_date = fixDate($_REQUEST['form_to_date'], date('Y-m-d'));
             $query .= "AND c.ct_proc = '1' ";
             $query .= "AND activity > 0 ORDER BY fe.date, fe.id ";
             $res = sqlStatement($query, $sqlBindArray);
+            $ledgerRows = [];
+            while ($ledgerRow = sqlFetchArray($res)) {
+                $ledgerRows[] = $ledgerRow;
+            }
+            // The billed payer's name, as the company join gave it.
+            $ledgerPayerNames = \OpenEMR\Services\InsuranceCompanyService::namesOf(array_column($ledgerRows, 'payer_id'));
 
             $patient = sqlQuery("SELECT * from patient_data WHERE pid=?", [$pid]);
             $pat_dob = $patient['DOB'];
@@ -465,7 +477,8 @@ $form_to_date = fixDate($_REQUEST['form_to_date'], date('Y-m-d'));
                 $prev_encounter_id = -1;
                 $hdr_printed = false;
                 $prev_row = [];
-                while ($erow = sqlFetchArray($res)) {
+                foreach ($ledgerRows as $erow) {
+                    $erow['name'] = \OpenEMR\Services\InsuranceCompanyService::nameFrom($ledgerPayerNames, $erow['payer_id']);
                     $print = '';
                     $csv = '';
                     if ($erow['encounter'] != $prev_encounter_id) {
