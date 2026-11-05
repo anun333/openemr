@@ -62,10 +62,7 @@ function universal_loadPayerInfo($pid, $date = ''): array
             continue;
         }
 
-        $crow = sqlQuery(
-            "SELECT * FROM insurance_companies WHERE id = ?",
-            [$drow['provider']]
-        );
+        $crow = \OpenEMR\Services\InsuranceCompanyService::columnsOf($drow['provider']);
 
         $orow = new InsuranceCompany($drow['provider']);
         $payers[$key] = [];

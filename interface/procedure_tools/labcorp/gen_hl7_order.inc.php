@@ -97,10 +97,7 @@ function labcorp_loadPayerInfo($pid, $date = ''): array
     foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
         $drow = $effective->columns;
         $ins = count($payers);
-        $crow = sqlQuery(
-            "SELECT * FROM insurance_companies WHERE id = ?",
-            [$drow['provider']]
-        );
+        $crow = \OpenEMR\Services\InsuranceCompanyService::columnsOf($drow['provider']);
         $orow = new InsuranceCompany($drow['provider']);
         $payers[$ins] = [];
         $payers[$ins]['data'] = $drow;
@@ -116,13 +113,8 @@ function loadGuarantorInfo($pid, $date = ''): array
         $date = date('Y-m-d');
     }
     $guarantors = [];
-    $gres = sqlStatement(
-        "SELECT * FROM insurance_data WHERE " .
-        "pid = ? AND date <= ? ORDER BY type ASC, date DESC LIMIT 1",
-        [$pid, $date]
-    );
     $prevtype = ''; // type is primary, secondary or tertiary
-    while ($drow = sqlFetchArray($gres)) {
+    foreach (\OpenEMR\Services\Insurance\PolicyRecords::guarantorRowOn($pid, $date) as $drow) {
         $gnt = count($guarantors);
 
         $guarantors[$gnt] = [];

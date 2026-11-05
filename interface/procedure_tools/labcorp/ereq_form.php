@@ -412,7 +412,7 @@ STYLES;
         foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $labDay) as $effective) {
             $policyRow = $effective->columns;
             if ($effective->policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary) {
-                $company = sqlQuery("SELECT name, id FROM insurance_companies WHERE id = ?", [$policyRow['provider']]);
+                $company = \OpenEMR\Services\InsuranceCompanyService::columnsOf($policyRow['provider'], 'name, id');
                 $primary = array_merge($policyRow, is_array($company) ? $company : []);
             }
         }
@@ -656,7 +656,7 @@ STYLES;
         $pdfContent .= '</td>';
         $pdfContent .= '<td class="width50">';
         $pdfContent .= '<table>';
-        $secondary = sqlQuery("SELECT i.*, ic.name, ic.id FROM insurance_data i join insurance_companies ic ON i.provider=ic.id WHERE i.pid=? and i.type='secondary' ORDER BY i.date DESC LIMIT 1", [$pid]);
+        $secondary = \OpenEMR\Services\Insurance\PolicyRecords::latestSecondaryWithPayer($pid);
         $pdfContent .= '<tr><td style="width:36%;text-align:right;">LCA Ins Code:</td><td style="width:64%;padding-left:8px;">&nbsp;</td></tr>';
         $saddress = sqlQuery("SELECT * FROM addresses WHERE foreign_id=?", [$secondary['id']]);
         $pdfContent .= '<tr><td style="text-align:right;">Ins Co Name:</td><td style="padding-left:8px;">' . text($secondary['name']) . '</td></tr>';
