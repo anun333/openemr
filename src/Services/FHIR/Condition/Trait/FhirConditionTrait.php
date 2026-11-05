@@ -11,8 +11,8 @@
 
 namespace OpenEMR\Services\FHIR\Condition\Trait;
 
-use DateTime;
-use DateTimeZone;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRCondition;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRCodeableConcept;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRCoding;
@@ -108,8 +108,9 @@ trait FhirConditionTrait
             return 'inactive';
         }
 
-        // Check occurrence and outcome for additional status
-        if ($dataRecord['occurrence'] == 1 || $dataRecord['outcome'] == 1) {
+        // Check outcome and occurrence for additional status. Occurrence 1 is "First" (a first episode),
+        // not a status, so it stays active.
+        if ($dataRecord['outcome'] == 1) {
             return 'resolved';
         } elseif ($dataRecord['occurrence'] > 1) {
             return 'recurrence';
@@ -119,20 +120,13 @@ trait FhirConditionTrait
         return 'active';
     }
 
+    /**
+     * Inactive when the problem isn't in force now: withdrawn (activity 0) or past its end date. A zero
+     * end date is no end.
+     */
     protected function isClinicalStatusInactive(array $dataRecord): bool
     {
-
-        try {
-            if (!empty($dataRecord['enddate'])) {
-                $date = new DateTime($dataRecord['enddate'], new DateTimeZone(date('P')));
-                $now = new DateTime('now', new DateTimeZone(date('P')));
-                if ($date < $now) {
-                    return true;
-                }
-            }
-        } catch (\Throwable) {
-        }
-        return false;
+        return !InForce::issue($dataRecord, (new SiteClock())->now());
     }
 
     protected function populateCode($dataRecord, FHIRCondition $conditionResource, string $defaultText)
@@ -230,7 +224,8 @@ trait FhirConditionTrait
 
     protected function populateAbatementDateTime($dataRecord, FHIRCondition $conditionResource)
     {
-        if (!empty($dataRecord['enddate'])) {
+        // a zero end date is no end, so no abatement (the condition is active)
+        if (!empty($dataRecord['enddate']) && InForce::hasEnd($dataRecord['enddate'])) {
             $conditionResource->setAbatementDateTime(new FHIRDateTime(UtilsService::getLocalDateAsUTC($dataRecord['enddate'])));
         }
     }
