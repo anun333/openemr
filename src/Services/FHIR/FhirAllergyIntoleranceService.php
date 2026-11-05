@@ -3,6 +3,8 @@
 namespace OpenEMR\Services\FHIR;
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIRAllergyIntolerance;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRAllergyIntoleranceCategory;
@@ -123,10 +125,12 @@ class FhirAllergyIntoleranceService extends FhirServiceBase implements IResource
         $id->setValue($dataRecord['uuid']);
         $allergyIntoleranceResource->setId($id);
 
+        // resolved when the outcome says so and it has an end; else active while in force now (not withdrawn,
+        // not ended: a future end is still active and a zero end is no end); else inactive
         $clinicalStatus = "inactive";
-        if ($dataRecord['outcome'] == '1' && isset($dataRecord['enddate'])) {
+        if ($dataRecord['outcome'] == '1' && InForce::hasEnd($dataRecord['enddate'] ?? null)) {
             $clinicalStatus = "resolved";
-        } elseif (!isset($dataRecord['enddate'])) {
+        } elseif (InForce::issue($dataRecord, (new SiteClock())->now())) {
             $clinicalStatus = "active";
         }
         $clinical_Status = new FHIRCodeableConcept();

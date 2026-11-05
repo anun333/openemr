@@ -20,6 +20,8 @@ namespace OpenEMR\Services;
 
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Services\Search\FhirSearchWhereClauseBuilder;
 use OpenEMR\Services\Search\ISearchField;
@@ -154,6 +156,10 @@ class PrescriptionService extends BaseService
      */
     private function getBaseSql(): string
     {
+        // status: active while in force (a prescription through its end day, a list medication until its end;
+        // a zero end is no end), completed once ended, stopped when withdrawn. A list medication saved with
+        // no activity stays stopped, as before.
+        $clock = new SiteClock();
         // order comes from our MedicationRequest intent value set, since we are only reporting on completed prescriptions
         // we will put the intent down as 'order' @see http://hl7.org/fhir/R4/valueset-medicationrequest-intent.html
         return "SELECT
@@ -242,8 +248,8 @@ class PrescriptionService extends BaseService
                             ,meds.medication_adherence
                             ,meds.medication_adherence_information_source
                             ,CASE
-                                WHEN prescriptions.end_date IS NOT NULL AND prescriptions.active = '1' THEN 'completed'
-                                WHEN prescriptions.active = '1' THEN 'active'
+                                WHEN prescriptions.active = '1' AND " . InForce::prescriptionNotEndedSqlOn('prescriptions', $clock->today()) . " THEN 'active'
+                                WHEN prescriptions.active = '1' THEN 'completed'
                                 ELSE 'stopped'
                             END as 'status'
                             ,prescriptions.dosage
@@ -296,8 +302,8 @@ class PrescriptionService extends BaseService
                         ,lists_medication.medication_adherence
                         ,lists_medication.medication_adherence_information_source
                         ,CASE
-                                WHEN lists.enddate IS NOT NULL AND lists.activity = 1 THEN 'completed'
-                                WHEN lists.activity = 1 THEN 'active'
+                                WHEN lists.activity = 1 AND " . InForce::issueNotEndedSqlAt('lists', $clock->now()) . " THEN 'active'
+                                WHEN lists.activity = 1 THEN 'completed'
                                 ELSE 'stopped'
                         END as 'status'
                         ,NULL as dosage
