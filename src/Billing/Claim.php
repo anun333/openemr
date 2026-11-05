@@ -1124,6 +1124,9 @@ class Claim
   //
     public function insuredRelationship($ins = 0): string
     {
+        if (!isset($this->payers[$ins]['data'])) {
+            return ''; // Twin (insurance-reference): no payer in force, nothing to map (as master)
+        }
         $tmp = strtolower(($this->payers[$ins]['data']['subscriber_relationship'] ?? ''));
         if (strcmp($tmp, 'self') == 0) {
             return '18';
