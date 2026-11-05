@@ -1345,12 +1345,18 @@ function make_insurance() {
 
                                     //------------------------------------------------------------------------------------
                                     //NumberOfInsurance
-                                    // Twin (insurance-reference): the levels in force on the visit date, as
-                                    // get_patient_balance() counts them (master: every level ever on file).
-                                    $NumberOfInsurance = count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
-                                        is_numeric($pid) ? (int)$pid : 0,
-                                        (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($dispdate) ? $dispdate : null)
-                                    ));
+                                    // Twin (insurance-reference): the highest level in force on the visit date, compared below with the
+                                    // last level closed (master: the number of levels ever on file). With no level in force the balance
+                                    // is the patient's; a gap (an ended primary, a current secondary) can't make an open level look closed.
+                                    $NumberOfInsurance = 0;
+                                    foreach (
+                                        (new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
+                                            is_numeric($pid) ? (int)$pid : 0,
+                                            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($dispdate) ? $dispdate : null)
+                                        ) as $policyInForce
+                                    ) {
+                                        $NumberOfInsurance = ['primary' => 1, 'secondary' => 2, 'tertiary' => 3][$policyInForce->level->value];
+                                    }
                                     //------------------------------------------------------------------------------------
                                     $duept = 0;
                                     if ((($NumberOfInsurance == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) {//Patient balance

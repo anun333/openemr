@@ -136,7 +136,9 @@ class DornGenHl7Order extends GenHl7OrderBase
         }
 
         // GT1 segment
-        $guarantors = $this->loadGuarantorInfo($porow['pid'], $labDay);
+        // Twin (insurance-reference): the guarantor stays master's (the latest policy's subscriber, on the
+        // order date): it names who pays, which isn't the coverage rule's question.
+        $guarantors = $this->loadGuarantorInfo($porow['pid'], $porow['date_ordered']);
         foreach ($guarantors as $guarantor) {
             $gType = $bill_type == "C" ? "C" : "P";
             $out .= $this->createGt1("1", $guarantor['data']['subscriber_fname'], $guarantor['data']['subscriber_lname'], $guarantor['data']['subscriber_mname'], $guarantor['data']['subscriber_street'], "", $guarantor['data']['subscriber_city'], $guarantor['data']['subscriber_state'], $guarantor['data']['subscriber_postal_code'], $gType, $guarantor['data']['subscriber_relationship']);

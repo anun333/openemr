@@ -112,13 +112,21 @@ function labcorp_loadPayerInfo($pid, $date = ''): array
 
 function loadGuarantorInfo($pid, $date = ''): array
 {
-    // Twin (insurance-reference): the first policy in force on the day (the
-    // primary when there is one), where master took the latest-starting row
-    // of the first level, ended or not.
-    $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
+    if (empty($date)) {
+        $date = date('Y-m-d');
+    }
     $guarantors = [];
-    foreach (array_slice((new InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $day), 0, 1) as $effective) {
-        $guarantors[] = ['data' => $effective->columns];
+    $gres = sqlStatement(
+        "SELECT * FROM insurance_data WHERE " .
+        "pid = ? AND date <= ? ORDER BY type ASC, date DESC LIMIT 1",
+        [$pid, $date]
+    );
+    $prevtype = ''; // type is primary, secondary or tertiary
+    while ($drow = sqlFetchArray($gres)) {
+        $gnt = count($guarantors);
+
+        $guarantors[$gnt] = [];
+        $guarantors[$gnt]['data'] = $drow;
     }
     return $guarantors;
 }
@@ -412,7 +420,9 @@ function labcorp_gen_hl7_order(int $orderid): Hl7OrderResult
         $out .= "IN1|$setid||||||||||||||||||||||||||||||||||||||||||||||$bill_type" . $d0;
     }
 
-    $guarantors = loadGuarantorInfo($porow['pid'], $labDay);
+    // Twin (insurance-reference): the guarantor stays master's (the latest policy's subscriber, on the
+    // order date): it names who pays, which isn't the coverage rule's question.
+    $guarantors = loadGuarantorInfo($porow['pid'], $porow['date_ordered']);
     foreach ($guarantors as $guarantor) {
         if (hl7Text($bill_type) != "C") {
             if ($guarantor['data']['subscriber_lname'] != "") {
