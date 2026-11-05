@@ -233,11 +233,12 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
     "c1.name AS cname1, c2.name AS cname2 " .
     "FROM patient_data AS p ";
     if (!empty($from_date)) {
+        // the whole days from the first through the last
+        $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('e.date', $from_date, $to_date);
         $query .= "JOIN form_encounter AS e ON " .
         "e.pid = p.pid AND " .
-        "e.date >= ? AND " .
-        "e.date <= ? ";
-        array_push($sqlArrayBind, $from_date . ' 00:00:00', $to_date . ' 23:59:59');
+        $onDays->sql . " ";
+        array_push($sqlArrayBind, ...$onDays->binds);
         if ($form_provider) {
             $query .= "AND e.provider_id = ? ";
             array_push($sqlArrayBind, $form_provider);

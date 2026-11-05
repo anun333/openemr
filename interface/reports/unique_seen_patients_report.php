@@ -208,6 +208,8 @@ $(function () {
 if (!empty($_POST['form_refresh']) || !empty($_POST['form_labels'])) {
     $totalpts = 0;
 
+    // the whole days from the first through the last
+    $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('e.date', $form_from_date, $form_to_date);
     $query = "SELECT " .
     "p.pid, p.fname, p.mname, p.lname, p.DOB, p.sex, p.ethnoracial, " .
     "p.street, p.city, p.state, p.postal_code, " .
@@ -217,8 +219,7 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_labels'])) {
     "FROM patient_data AS p " .
     "JOIN form_encounter AS e ON " .
     "e.pid = p.pid AND " .
-    "e.date >= ? AND " .
-    "e.date <= ? " .
+    $onDays->sql . " " .
     "LEFT OUTER JOIN insurance_data AS i1 ON " .
     "i1.pid = p.pid AND i1.type = 'primary' " .
     "LEFT OUTER JOIN insurance_companies AS c1 ON " .
@@ -229,7 +230,7 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_labels'])) {
     "c2.id = i2.provider " .
     "GROUP BY p.lname, p.fname, p.mname, p.pid, i1.date, i2.date " .
     "ORDER BY p.lname, p.fname, p.mname, p.pid, i1.date DESC, i2.date DESC";
-    $res = sqlStatement($query, [$form_from_date . ' 00:00:00', $form_to_date . ' 23:59:59']);
+    $res = sqlStatement($query, $onDays->binds);
 
     $prevpid = 0;
     while ($row = sqlFetchArray($res)) {

@@ -54,6 +54,25 @@ final class DateRange
     }
 
     /**
+     * The whole days from F through T, as the reports that append 00:00:00 and 23:59:59 to their bounds ask it:
+     * col >= F 00:00:00 AND col < (T + 1 day) 00:00:00 when both are days (the same rows: no column here stores a
+     * fraction of a second), and the reports' own col >= 'F 00:00:00' AND col <= 'T 23:59:59' when either isn't.
+     *
+     * @param string $column a column reference, written into the SQL as given (callers pass literals)
+     */
+    public static function wholeDays(string $column, mixed $firstDay, mixed $lastDay): SqlCondition
+    {
+        $first = is_string($firstDay) ? DateInput::iso($firstDay) : null;
+        $last = is_string($lastDay) ? DateInput::iso($lastDay) : null;
+        $firstAsDay = $first === null ? null : Day::fromIso($first);
+        $lastAsDay = $last === null ? null : Day::fromIso($last);
+        if ($firstAsDay === null || $lastAsDay === null || $lastAsDay->year >= 9999 && $lastAsDay->month === 12 && $lastAsDay->day === 31) {
+            return new SqlCondition("$column >= ? AND $column <= ?", [self::asBound($firstDay) . ' 00:00:00', self::asBound($lastDay) . ' 23:59:59']);
+        }
+        return new SqlCondition("$column >= ? AND $column < ?", [$firstAsDay->storedStart(), $lastAsDay->plusDays(1)->storedStart()]);
+    }
+
+    /**
      * The start side alone: rows from day F on (col >= F: a date-only F is that day's midnight). The bound is passed
      * as the caller has it.
      *

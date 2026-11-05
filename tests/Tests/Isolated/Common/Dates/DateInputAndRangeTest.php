@@ -113,6 +113,17 @@ final class DateInputAndRangeTest extends TestCase
     }
 
     #[Test]
+    public function wholeDaysAreTheReportsOwnRangeWhenABoundIsNotADay(): void
+    {
+        $days = DateRange::wholeDays('fe.date', '2026-11-01', '2026-11-04');
+        self::assertSame('fe.date >= ? AND fe.date < ?', $days->sql);
+        self::assertSame(['2026-11-01 00:00:00', '2026-11-05 00:00:00'], $days->binds);
+        $odd = DateRange::wholeDays('fe.date', '2026-11-01', '');
+        self::assertSame('fe.date >= ? AND fe.date <= ?', $odd->sql);
+        self::assertSame(['2026-11-01 00:00:00', ' 23:59:59'], $odd->binds);
+    }
+
+    #[Test]
     public function aPeriodIsHalfOpen(): void
     {
         $zone = new DateTimeZone('America/Chicago');

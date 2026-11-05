@@ -118,13 +118,10 @@ $query = "SELECT " .
   "LEFT JOIN users AS u ON u.id = fe.provider_id " .
   "$esign_joins" .
   "WHERE f.pid = fe.pid AND f.encounter = fe.encounter AND f.formdir = 'newpatient' ";
-if ($form_to_date) {
-    $query .= "AND fe.date >= ? AND fe.date <= ? ";
-    array_push($sqlBindArray, $form_from_date . ' 00:00:00', $form_to_date . ' 23:59:59');
-} else {
-    $query .= "AND fe.date >= ? AND fe.date <= ? ";
-    array_push($sqlBindArray, $form_from_date . ' 00:00:00', $form_from_date . ' 23:59:59');
-}
+// the whole days from the first through the last (one day when there is no last)
+$onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $form_from_date, $form_to_date ?: $form_from_date);
+$query .= "AND " . $onDays->sql . " ";
+array_push($sqlBindArray, ...$onDays->binds);
 
 if ($form_provider) {
     $query .= "AND fe.provider_id = ? ";
