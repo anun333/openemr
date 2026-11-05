@@ -54,6 +54,17 @@ final class DateRange
     }
 
     /**
+     * The start side alone: rows from day F on (col >= F: a date-only F is that day's midnight). The bound is passed
+     * as the caller has it.
+     *
+     * @param string $column a column reference, written into the SQL as given (callers pass literals)
+     */
+    public static function from(string $column, mixed $firstDay): SqlCondition
+    {
+        return new SqlCondition("$column >= ?", [self::asBound($firstDay)]);
+    }
+
+    /**
      * A whole range when both sides are days; otherwise each side as through() and a plain
      * col >= value keep it (the first day's midnight is the value itself).
      */

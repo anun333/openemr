@@ -91,6 +91,9 @@ final class DateInputAndRangeTest extends TestCase
         self::assertSame('l.date <= ?', $null->sql);
         self::assertSame([null], $null->binds);
         self::assertSame(['9999-12-31'], DateRange::through('l.date', '9999-12-31')->binds);
+        $from = DateRange::from('e.date', '2026-01-01');
+        self::assertSame('e.date >= ?', $from->sql);
+        self::assertSame(['2026-01-01'], $from->binds);
         $both = DateRange::between('e.date', '2026-01-01', '2026-11-04');
         self::assertSame('e.date >= ? AND e.date < ?', $both->sql);
         self::assertSame(['2026-01-01', '2026-11-05 00:00:00'], $both->binds);

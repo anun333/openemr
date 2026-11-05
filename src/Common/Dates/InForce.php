@@ -143,6 +143,36 @@ final class InForce
         return "({$a}`enddate` IS NULL OR {$a}`enddate` = '" . self::ZERO_DATETIME . "' OR {$a}`enddate` >= '$moment')";
     }
 
+    /**
+     * Begun by the moment: no begin date, or a begin date on or before it (one placeholder, the moment). The fee
+     * sheet's problems ask this beside the rule; it isn't part of "in force" (open question B).
+     */
+    public static function issueBegunSql(string $alias = ''): string
+    {
+        $a = $alias === '' ? '' : "`$alias`.";
+        return "(({$a}`begdate` IS NULL) OR ({$a}`begdate` IS NOT NULL AND {$a}`begdate` <= ?))";
+    }
+
+    /**
+     * Begun by the moment, an issue with no begin date counted from when it was entered (two placeholders, the
+     * moment twice): the rules engine's question.
+     */
+    public static function issueBegunOrEnteredSql(string $alias = ''): string
+    {
+        $a = $alias === '' ? '' : "`$alias`.";
+        return "(({$a}`begdate` IS NULL AND {$a}`date` <= ?) OR ({$a}`begdate` IS NOT NULL AND {$a}`begdate` <= ?))";
+    }
+
+    /**
+     * No end date at all (NULL or zero), the question "open-ended", not "in force": eRx's allergy download matches
+     * the rows NewCrop still holds by it. dateEmptySql()'s test.
+     */
+    public static function issueHasNoEndSql(string $alias = ''): string
+    {
+        $a = $alias === '' ? '' : "`$alias`.";
+        return "({$a}`enddate` IS NULL OR {$a}`enddate` = '" . self::ZERO_DATE . "')";
+    }
+
     // ---- prescriptions ------------------------------------------------------------------------------
 
     /**
@@ -181,7 +211,25 @@ final class InForce
     public static function prescriptionSql(string $alias = ''): string
     {
         $a = $alias === '' ? '' : "`$alias`.";
-        return "({$a}`active` = 1 AND " . self::prescriptionNotEndedSql($alias) . ")";
+        return "(" . self::prescriptionNotWithdrawnSql($alias) . " AND " . self::prescriptionNotEndedSql($alias) . ")";
+    }
+
+    /**
+     * Not withdrawn: active = 1 (the Rx editor's "currently active"; 0 unticked, -1 the C-CDA import's
+     * discontinue). No placeholder.
+     */
+    public static function prescriptionNotWithdrawnSql(string $alias = ''): string
+    {
+        $a = $alias === '' ? '' : "`$alias`.";
+        return "{$a}`active` = 1";
+    }
+
+    /**
+     * The whole rule with the day written in (see issueNotEndedSqlAt()): for a computed column.
+     */
+    public static function prescriptionSqlOn(string $alias, Day $on): string
+    {
+        return "(" . self::prescriptionNotWithdrawnSql($alias) . " AND " . self::prescriptionNotEndedSqlOn($alias, $on) . ")";
     }
 
     /**

@@ -99,6 +99,19 @@ final class InForceTest extends TestCase
     }
 
     #[Test]
+    public function theNamedPartsAreTheQuestionsReadersAskBesideTheRule(): void
+    {
+        self::assertSame("((`l`.`begdate` IS NULL) OR (`l`.`begdate` IS NOT NULL AND `l`.`begdate` <= ?))", InForce::issueBegunSql('l'));
+        self::assertSame("((`begdate` IS NULL AND `date` <= ?) OR (`begdate` IS NOT NULL AND `begdate` <= ?))", InForce::issueBegunOrEnteredSql());
+        self::assertSame("(`enddate` IS NULL OR `enddate` = '0000-00-00')", InForce::issueHasNoEndSql());
+        self::assertSame("`l`.`active` = 1", InForce::prescriptionNotWithdrawnSql('l'));
+        self::assertSame(
+            "(`p`.`active` = 1 AND (`p`.`end_date` IS NULL OR `p`.`end_date` = '0000-00-00' OR `p`.`end_date` > '2026-11-04'))",
+            InForce::prescriptionSqlOn('p', Day::of(2026, 11, 4))
+        );
+    }
+
+    #[Test]
     public function theSqlFormsBindTheSameMoment(): void
     {
         self::assertSame(
