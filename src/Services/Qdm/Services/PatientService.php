@@ -69,6 +69,60 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
     /** @var array<int, ?string> the Source of Payment Typology code by company id */
     private static array $payerCodes = [];
 
+    /**
+     * The runs of days of the patient's payer (QDM 5.6 Patient Characteristic Payer: its code and
+     * relevantPeriod). With insurance_us_specs on, the payer on a day is the first payer in force
+     * that day, by level: a sole secondary, or the secondary after the primary ended, is the payer,
+     * as it is the claim's primary (X12 5010 SBR01). Off, only primary policies count, as before.
+     *
+     * @return list<\OpenEMR\Services\Insurance\CoverageSegment>
+     */
+    private static function payerRuns(int $pid, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $coverage = new \OpenEMR\Services\InsuranceService();
+        if (!\OpenEMR\Core\OEGlobalsBag::getInstance()->getBoolean('insurance_us_specs', true)) {
+            return $coverage->getCoverageSegments($pid, \OpenEMR\Services\Insurance\InsuranceLevel::Primary, $from, $to);
+        }
+        $byLevel = [];
+        $bounds = [];
+        foreach (\OpenEMR\Services\Insurance\InsuranceLevel::cases() as $level) {
+            $byLevel[] = $segments = $coverage->getCoverageSegments($pid, $level, $from, $to);
+            foreach ($segments as $segment) {
+                $bounds[$segment->from->getTimestamp()] = $segment->from;
+                $bounds[$segment->to->modify('+1 day')->getTimestamp()] = $segment->to->modify('+1 day');
+            }
+        }
+        ksort($bounds);
+        $bounds = array_values($bounds);
+        $runs = [];
+        for ($i = 0; $i + 1 < count($bounds); $i++) {
+            $day = $bounds[$i];
+            $head = null;
+            foreach ($byLevel as $segments) {
+                foreach ($segments as $segment) {
+                    if ($segment->from <= $day && $segment->to >= $day) {
+                        $head = $segment;
+                        break 2;
+                    }
+                }
+            }
+            if ($head === null) {
+                continue;
+            }
+            $last = array_pop($runs);
+            $through = $bounds[$i + 1]->modify('-1 day');
+            if ($last !== null && $last->policy->id === $head->policy->id && $last->to->modify('+1 day') == $day) {
+                $runs[] = new \OpenEMR\Services\Insurance\CoverageSegment($last->policy, $last->from, $through);
+                continue;
+            }
+            if ($last !== null) {
+                $runs[] = $last;
+            }
+            $runs[] = new \OpenEMR\Services\Insurance\CoverageSegment($head->policy, $day, $through);
+        }
+        return $runs;
+    }
+
     private static function payerCode(int $companyId): ?string
     {
         if (!array_key_exists($companyId, self::$payerCodes)) {
@@ -179,12 +233,7 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
         // start), one that reaches its last day is open.
         $always = new \DateTimeImmutable(self::ALWAYS);
         $open = new \DateTimeImmutable(self::OPEN);
-        $segments = (new \OpenEMR\Services\InsuranceService())->getCoverageSegments(
-            is_numeric($record['pid']) ? (int)$record['pid'] : 0,
-            \OpenEMR\Services\Insurance\InsuranceLevel::Primary,
-            $always,
-            $open
-        );
+        $segments = self::payerRuns(is_numeric($record['pid']) ? (int)$record['pid'] : 0, $always, $open);
         $periods = [];
         foreach ($segments as $segment) {
             $periods[] = [
