@@ -10,7 +10,6 @@
 
 namespace OpenEMR\Services\Qdm\Services;
 
-use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Cqm\Qdm\BaseTypes\Address;
 use OpenEMR\Cqm\Qdm\BaseTypes\Code;
 use OpenEMR\Cqm\Qdm\BaseTypes\DateTime;
@@ -73,7 +72,8 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
     private static function payerCode(int $companyId): ?string
     {
         if (!array_key_exists($companyId, self::$payerCodes)) {
-            $sop = QueryUtils::fetchSingleValue('SELECT cqm_sop FROM insurance_companies WHERE id = ?', 'cqm_sop', [$companyId]);
+            $sopRow = \OpenEMR\Services\InsuranceCompanyService::columnsOf($companyId, 'cqm_sop');
+            $sop = is_array($sopRow) ? $sopRow['cqm_sop'] : null;
             self::$payerCodes[$companyId] = is_scalar($sop) && (string)$sop !== '' ? (string)$sop : null;
         }
         return self::$payerCodes[$companyId];

@@ -2265,7 +2265,7 @@ class CdaTemplateImportDispose
             return;
         }
 
-        $res_ins = QueryUtils::fetchRecords("SELECT `id`, `uuid` FROM `insurance_companies` WHERE `cqm_sop` = ? AND `inactive` = 0 ORDER BY `id` DESC LIMIT 1", [$code]);
+        $res_ins = \OpenEMR\Services\InsuranceCompanyService::newestActiveBySourceOfPayment($code);
         $res_ins_cur = $res_ins[0] ?? [];
         if (empty($res_ins_cur['id'])) {
             $data["name"] = 'QRDA Insurance Company Payer ' . $code;

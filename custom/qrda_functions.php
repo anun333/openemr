@@ -59,11 +59,7 @@ function getQRDAPayerInfo($patArr): array
     $payerCheckArr['Private Health Insurance'] = 0;
     $payerCheckArr['Other'] = 0;
     if (count($patArr) > 0) {
-        $insQry = "SELECT insd.*, ic.ins_type_code FROM (SELECT pid, provider FROM insurance_data WHERE type = 'primary' ORDER BY id DESC) insd " .
-                  "INNER JOIN  insurance_companies ic ON insd.provider = ic.id " .
-                  "WHERE insd.pid IN (" . add_escape_custom(implode(",", $patArr)) . ")";
-        $insRes = sqlStatement($insQry);
-        while ($insRow = sqlFetchArray($insRes)) {
+        foreach (\OpenEMR\Services\Insurance\PolicyRecords::primaryPayerTypes(is_array($patArr) ? $patArr : []) as $insRow) {
             if ($insRow['ins_type_code'] == 8) {//Self Pay (Private Insurance)
                 $payerCheckArr['Private Health Insurance']++;
             } elseif ($insRow['ins_type_code'] == 2) {//Medicare
@@ -155,11 +151,7 @@ function getQRDAPatientNeedInfo($patArr): array
 function payerPatient($patient_id): string
 {
     $payer = 'Other';
-    $insQry = "SELECT insd.*, ic.ins_type_code FROM (SELECT pid, provider FROM insurance_data WHERE type = 'primary' ORDER BY id DESC) insd " .
-              "INNER JOIN  insurance_companies ic ON insd.provider = ic.id " .
-              "WHERE insd.pid = ?";
-    $insRes = sqlStatement($insQry, [$patient_id]);
-    while ($insRow = sqlFetchArray($insRes)) {
+    foreach (\OpenEMR\Services\Insurance\PolicyRecords::primaryPayerTypesForPatient($patient_id) as $insRow) {
         if ($insRow['ins_type_code'] == 8) {//Self Pay (Private Insurance)
             $payer = 'Private Health Insurance';
         } elseif ($insRow['ins_type_code'] == 2) {//Medicare

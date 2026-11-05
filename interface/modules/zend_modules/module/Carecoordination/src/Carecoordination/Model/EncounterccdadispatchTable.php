@@ -4929,22 +4929,20 @@ class EncounterccdadispatchTable
         $types = ['primary'];
 
         foreach ($types as $type) {
+            // The policy with its company (the coverage service), then the company's address and work phone and
+            // the patient, as the one query that joined them gave its first row.
             $sql = "
-            SELECT i.*, c.name AS company_name,
-                   c.uuid as compuuid,
-                   a.line1, a.line2, a.city, a.state, a.zip, a.plus_four, a.country,
+            SELECT a.line1, a.line2, a.city, a.state, a.zip, a.plus_four, a.country,
                    a.foreign_id,
                    p.uuid AS piduuid,
                    p.fname AS patient_fname, p.mname AS patient_mname, p.lname AS patient_lname,
                    p.street AS patient_street, p.city AS patient_city, p.state AS patient_state,
                    p.postal_code AS patient_postal_code, p.DOB AS patient_dob
                    , CONCAT('(', pn.area_code, ')', pn.prefix, '-', pn.number) AS phone
-            FROM insurance_data i
-            JOIN insurance_companies c ON i.provider = c.id
-            LEFT JOIN addresses a ON c.id = a.foreign_id
-            LEFT JOIN phone_numbers pn ON pn.foreign_id = c.id AND pn.type = 2
-            JOIN patient_data p ON i.pid = p.pid
-            WHERE i.type = ? AND i.pid = ? AND i.id = ?
+            FROM patient_data p
+            LEFT JOIN addresses a ON a.foreign_id = ?
+            LEFT JOIN phone_numbers pn ON pn.foreign_id = ? AND pn.type = 2
+            WHERE p.pid = ?
         ";
             // Twin (insurance-reference): the policy in force on the document's date (a CCD: today),
             // through the coverage service; a company without an address row or a phone is kept.
@@ -4957,8 +4955,10 @@ class EncounterccdadispatchTable
             if ($policyId === null) {
                 continue; // nothing in force at this level
             }
-            $res = sqlStatement($sql, [$type, $pid, $policyId]);
-            $row = sqlFetchArray($res);
+            $policyRow = \OpenEMR\Services\Insurance\PolicyRecords::withPayerById($type, $pid, $policyId);
+            $res = is_array($policyRow) ? sqlStatement($sql, [$policyRow['provider'], $policyRow['provider'], $policyRow['pid']]) : null;
+            $row = $res !== null ? sqlFetchArray($res) : false;
+            $row = is_array($policyRow) && is_array($row) ? array_merge($policyRow, $row) : false;
             if (!$row) {
                 continue; // no data for this type
             }
