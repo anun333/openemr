@@ -4920,6 +4920,13 @@ class InternalToCdaConverter
     {
         $entryRel = $this->createElement('entryRelationship');
         $entryRel->setAttribute('typeCode', 'COMP');
+        // The policy's place in the coordination of benefits (the entryRelationship's sequenceNumber), when the input gives it.
+        $sequence = $this->xpathValue('sequence', $payer);
+        if (ctype_digit($sequence) && $sequence !== '0') {
+            $sequenceNumber = $this->createElement('sequenceNumber');
+            $sequenceNumber->setAttribute('value', $sequence);
+            $entryRel->appendChild($sequenceNumber);
+        }
 
         $policyAct = $this->createElement('act');
         $policyAct->setAttribute('classCode', 'ACT');
