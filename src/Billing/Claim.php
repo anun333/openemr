@@ -1092,15 +1092,34 @@ class Claim
         return $this->x12Clean(trim(str_replace('-', '', ($tmp['group_number'] ?? ''))));
     }
 
-  // Returns 'P', 'S' or 'T'.
+  // Returns 'P', 'S' or 'T': the payer's stored level (the posting levels, Ins1/Ins2 and
+  // payerLevel(), are these).
   //
-    // Twin (insurance-reference): DEFAULT 2 (#15038): when the only payer in force is stored as
-    // secondary, SBR01 stays its stored level ('S'), as before. X12 RFI 1980 ("there must be a
-    // primary payer") would send 'P' for payer 0 when no payer in force is stored as primary: that
-    // change would go here.
     public function payerSequence($ins = 0): string
     {
         return strtoupper(substr(($this->payers[$ins]['data']['type'] ?? ''), 0, 1));
+    }
+
+    /**
+     * The payer's place on this claim, as X12 5010 sends it in SBR01 (the 2000B and 2320
+     * loops): the payers in force on the date of service, in level order, are P, S and T with
+     * no gap, so a sole secondary is the claim's primary payer (X12 RFI 1980: there must be a
+     * primary payer). With x12_5010_payer_rules off, it is the stored level, as before.
+     */
+    public function x12PayerSequence(mixed $ins = 0): string
+    {
+        $stored = $this->payerSequence($ins);
+        if ($stored === '' || !OEGlobalsBag::getInstance()->getBoolean('x12_5010_payer_rules', true)) {
+            return $stored;
+        }
+        $inForce = [];
+        for ($i = 0, $count = $this->payerCount(); $i < $count; $i++) {
+            $inForce[] = $this->payerSequence($i);
+        }
+        $order = array_values(array_intersect(['P', 'S', 'T'], $inForce));
+        $place = array_search($stored, $order, true);
+        $sequence = ['P', 'S', 'T'];
+        return is_int($place) ? ($sequence[$place] ?? $stored) : $stored;
     }
 
   // Returns the HIPAA code of the patient-to-subscriber relationship.
@@ -1136,7 +1155,8 @@ class Claim
 
     public function insuredTypeCode($ins = 0)
     {
-        if (strcmp((string) $this->claimType($ins), 'MB') == 0 && $this->payerSequence($ins) != 'P') {
+        // SBR05 is sent when Medicare isn't the claim's primary payer (X12 5010 2000B and 2320 SBR05).
+        if (strcmp((string) $this->claimType($ins), 'MB') == 0 && $this->x12PayerSequence($ins) != 'P') {
             return $this->payers[$ins]['data']['policy_type'];
         } else {
             return '';

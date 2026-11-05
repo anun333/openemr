@@ -1551,6 +1551,13 @@ $GLOBALS_METADATA = [
             xl('The insurer\'s payer ids in FHIR follow US Core, the dates an eligibility response stores follow X12 5010, and the eCQM payer follows QDM. Off keeps the output of earlier versions.')
         ],
 
+        'x12_5010_payer_rules' => [
+            xl('Claims Follow the X12 5010 Payer Rules'),
+            'bool',                           // data type
+            '1',                              // default = true
+            xl('On a claim, the payers in force on the date of service are primary, secondary and tertiary in order (SBR01), so a sole secondary is sent as primary, and the institutional claim sends no insurance type for the other payers (2320 SBR05). Off sends each payer\'s stored level and type, as before.')
+        ],
+
         'gen_x12_based_on_ins_co' => [
             xl('Generate X-12 Based On Insurance Company'),
             'bool',                           // data type

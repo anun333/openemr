@@ -1105,7 +1105,17 @@ HTML;
                         break;
 
                     case 'DTP':
-                        if ($elements[2] == "D8") {
+                        if ($elements[2] == "D8" && OEGlobalsBag::getInstance()->getBoolean('insurance_us_specs', true)) {
+                            // 005010X279A1 2110C DTP01: a single date is the benefit's begin (346 plan, 348
+                            // benefit, 356 eligibility, 291 plan, 307 eligibility) or its end (347 plan, 349
+                            // benefit, 357 eligibility), and keeps the other bound already read for it.
+                            $day = \DateTimeImmutable::createFromFormat('!Ymd', $elements[3]);
+                            $text = $day !== false && $day->format('Ymd') === $elements[3] ? $day->format('Y-m-d') : '';
+                            $current = ($loop['context'] ?? '') === 'EB' && $benefits !== [] ? $benefits[count($benefits) - 1] : [];
+                            $isEnd = in_array($elements[1], ['347', '349', '357'], true);
+                            $loop['start_date'] = $isEnd ? (is_string($current['start_date'] ?? null) ? $current['start_date'] : '') : $text;
+                            $loop['end_date'] = $isEnd ? $text : (is_string($current['end_date'] ?? null) ? $current['end_date'] : '');
+                        } elseif ($elements[2] == "D8") {
                             $loop['start_date'] = $elements[3] ? date("Y-m-d", strtotime($elements[3])) : '';
                             $loop['end_date'] = '';
                         } elseif ($elements[2] == "RD8") {

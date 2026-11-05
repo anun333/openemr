@@ -13,6 +13,7 @@
 namespace OpenEMR\Billing;
 
 use OpenEMR\Billing\BillingProcessor\BillingClaimBatchControlNumber;
+use OpenEMR\Core\OEGlobalsBag;
 
 class X125010837I
 {
@@ -234,7 +235,7 @@ class X125010837I
 
         //SBR01 is either a P or S    SBR02 for care is always 18 "patient"  SBR09 is always MA
         $out .= "SBR" .       // Subscriber Information
-            "*" . $claim->payerSequence() .
+            "*" . $claim->x12PayerSequence() .
             "*" . ($claim->isSelfOfInsured() ? '18' : '') .
             "*" . $claim->groupNumber() .
             "*" . (($claim->groupNumber()) ? '' : $claim->groupName()) .
@@ -889,11 +890,12 @@ class X125010837I
             ++$edicount;
 
             $out .= "SBR" . // Loop 2320, Subscriber Information - page 297/318
-                "*" . $claim->payerSequence($ins) .
+                "*" . $claim->x12PayerSequence($ins) .
                 "*" . $claim->insuredRelationship($ins) .
                 "*" . $claim->groupNumber($ins) .
                 "*" . (($claim->groupNumber($ins)) ? '' : $claim->groupName($ins)) .
-                "*" . ($claim->insuredTypeCode($ins) ?: $tmp2) .
+                // 005010X223A2 marks 2320 SBR05 (insurance type) Not Used; the switch off sends it as before.
+                "*" . (OEGlobalsBag::getInstance()->getBoolean('x12_5010_payer_rules', true) ? '' : ($claim->insuredTypeCode($ins) ?: $tmp2)) .
                 "*" .
                 "*" .
                 "*" .

@@ -390,7 +390,7 @@ class X125010837P
 
         ++$edicount;
         $out .= "SBR" .    // Subscriber Information
-            "*" . $claim->payerSequence() .
+            "*" . $claim->x12PayerSequence() .
             "*" . ($claim->isSelfOfInsured() ? '18' : '') .
             "*" . $claim->groupNumber() .
             "*" . ($claim->groupNumber() ? '' : $claim->groupName()) . // if groupNumber no groupName
@@ -1099,7 +1099,7 @@ class X125010837P
 
             ++$edicount;
             $out .= "SBR" . // Loop 2320, Subscriber Information - page 297/318
-                "*" . $claim->payerSequence($ins) .
+                "*" . $claim->x12PayerSequence($ins) .
                 "*" . $claim->insuredRelationship($ins) .
                 "*" . $claim->groupNumber($ins) .
                 "*" . ($claim->groupNumber() ? '' : $claim->groupName()) .
