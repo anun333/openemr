@@ -143,13 +143,13 @@ if ($exclude_policy != "") {
         // excluded number matches whatever its case or trailing spaces (the column's collation).
         $policyNumber = $row['policy_number'] ?? null;
         $fold = static fn(mixed $v): string => strtolower(rtrim(is_scalar($v) ? (string)$v : ''));
-        if ($policyNumber === null || $policyNumber === '' || in_array($fold($policyNumber), array_map($fold, is_array($excludedPolicies ?? null) ? $excludedPolicies : []), true)) {
+        if ($policyNumber === null || rtrim(is_scalar($policyNumber) ? (string)$policyNumber : '', ' ') === '' || in_array($fold($policyNumber), array_map($fold, is_array($excludedPolicies ?? null) ? $excludedPolicies : []), true)) {
             continue;
         }
         $res[] = $row;
     }
     $payerName = static fn(array $r): string => is_string($r['payer_name'] ?? null) ? $r['payer_name'] : '';
-    usort($res, static fn(array $a, array $b): int => strcasecmp($payerName($a), $payerName($b)));
+    usort($res, static fn(array $a, array $b): int => strcmp(strtoupper($payerName($a)), strtoupper($payerName($b))));
     // Get the facilities information
     $facilities     = getUserFacilities($session->get('authUserID'));
 
