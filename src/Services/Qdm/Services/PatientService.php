@@ -180,7 +180,7 @@ class PatientService extends AbstractQdmService implements QdmServiceInterface
         $always = new \DateTimeImmutable(self::ALWAYS);
         $open = new \DateTimeImmutable(self::OPEN);
         $segments = (new \OpenEMR\Services\InsuranceService())->getCoverageSegments(
-            (int)$record['pid'],
+            is_numeric($record['pid']) ? (int)$record['pid'] : 0,
             \OpenEMR\Services\Insurance\InsuranceLevel::Primary,
             $always,
             $open

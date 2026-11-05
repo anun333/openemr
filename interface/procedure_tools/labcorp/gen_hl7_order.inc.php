@@ -96,7 +96,7 @@ function labcorp_loadPayerInfo($pid, $date = ''): array
     // secondary (IN1-22, the requisition's secondary fields).
     $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
     $payers = [];
-    foreach ((new InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $day) as $effective) {
+    foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
         $drow = $effective->columns;
         $ins = $effective->policy->level->number() - 1;
         $crow = sqlQuery(

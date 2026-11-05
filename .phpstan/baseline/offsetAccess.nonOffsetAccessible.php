@@ -11078,7 +11078,7 @@ $ignoreErrors[] = [
 ];
 $ignoreErrors[] = [
     'message' => '#^Cannot access offset \'date_ordered\' on mixed\\.$#',
-    'count' => 2,
+    'count' => 1,
     'path' => __DIR__ . '/../../interface/modules/custom_modules/oe-module-dorn/src/DornGenHl7Order.php',
 ];
 $ignoreErrors[] = [
@@ -18787,11 +18787,6 @@ $ignoreErrors[] = [
     'path' => __DIR__ . '/../../interface/patient_file/front_payment.php',
 ];
 $ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'NumberOfInsurance\' on array\\|false\\.$#',
-    'count' => 1,
-    'path' => __DIR__ . '/../../interface/patient_file/front_payment.php',
-];
-$ignoreErrors[] = [
     'message' => '#^Cannot access offset \'PatientPay\' on array\\|false\\.$#',
     'count' => 1,
     'path' => __DIR__ . '/../../interface/patient_file/front_payment.php',
@@ -21932,11 +21927,6 @@ $ignoreErrors[] = [
     'path' => __DIR__ . '/../../interface/reports/collections_report.php',
 ];
 $ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'group_number\' on array\\|false\\.$#',
-    'count' => 1,
-    'path' => __DIR__ . '/../../interface/reports/collections_report.php',
-];
-$ignoreErrors[] = [
     'message' => '#^Cannot access offset \'insname\' on mixed\\.$#',
     'count' => 1,
     'path' => __DIR__ . '/../../interface/reports/collections_report.php',
@@ -24409,11 +24399,6 @@ $ignoreErrors[] = [
 $ignoreErrors[] = [
     'message' => '#^Cannot access offset \'provid\' on mixed\\.$#',
     'count' => 2,
-    'path' => __DIR__ . '/../../library/FeeSheet.class.php',
-];
-$ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'provider\' on mixed\\.$#',
-    'count' => 1,
     'path' => __DIR__ . '/../../library/FeeSheet.class.php',
 ];
 $ignoreErrors[] = [
@@ -31668,11 +31653,6 @@ $ignoreErrors[] = [
 ];
 $ignoreErrors[] = [
     'message' => '#^Cannot access offset \'MoneyGot\' on array\\|false\\.$#',
-    'count' => 1,
-    'path' => __DIR__ . '/../../portal/portal_payment.php',
-];
-$ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'NumberOfInsurance\' on array\\|false\\.$#',
     'count' => 1,
     'path' => __DIR__ . '/../../portal/portal_payment.php',
 ];
