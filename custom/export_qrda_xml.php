@@ -341,7 +341,7 @@ $main_title = "QRDA Calculated Summary Report";
 $xml->add_title($main_title);
 
 //Effective date and time
-$eff_datetime = date('Ymdhis', strtotime((string) $target_date));
+$eff_datetime = date('YmdHis', strtotime((string) $target_date));
 $xml->self_efftime($eff_datetime);
 
 $xml->self_confidentcode();
@@ -363,7 +363,7 @@ $xml->close_recordTarget();
 ############### Author Info #######################
 $xml->open_author();
 //Author time
-$auth_dtime = date('Ymdhis', strtotime(date('Y-m-d H:i:s')));
+$auth_dtime = date('YmdHis', strtotime(date('Y-m-d H:i:s')));
 $xml->self_authorTime($auth_dtime);
 //Assigned Author
 $xml->open_assignAuthor();
@@ -408,7 +408,7 @@ $xml->close_infoRecipient();
 
 ############### Legal Authenticator #######################
 $xml->open_legalAuthenticator();
-$auth_dtime = date('Ymdhis', strtotime(date('Y-m-d H:i:s')));
+$auth_dtime = date('YmdHis', strtotime(date('Y-m-d H:i:s')));
 $xml->self_authorTime($auth_dtime);
 $xml->self_legalSignCode();
 

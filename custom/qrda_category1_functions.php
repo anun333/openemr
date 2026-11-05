@@ -95,7 +95,7 @@ function getHeaderQRDA1($xml, $patient_id, $provider_id): void
     $xml->add_title($main_title);
 
     //Effective date and time
-    $eff_datetime = date('Ymdhis', strtotime((string) $from_date));
+    $eff_datetime = date('YmdHis', strtotime((string) $from_date));
     $xml->self_efftime($eff_datetime);
 
     $xml->self_confidentcode();
@@ -153,7 +153,7 @@ function getHeaderQRDA1($xml, $patient_id, $provider_id): void
     $xml->open_author();
 
     //Author time
-    $auth_dtime = date('Ymdhis');
+    $auth_dtime = date('YmdHis');
     $xml->self_authorTime($auth_dtime);
 
     //Assigned Author
@@ -193,7 +193,7 @@ function getHeaderQRDA1($xml, $patient_id, $provider_id): void
 
     ############### Legal Authenticator Start#######################
     $xml->open_legalAuthenticator();
-    $auth_dtime = date('Ymdhis');
+    $auth_dtime = date('YmdHis');
     $xml->self_authorTime($auth_dtime);
     $xml->self_legalSignCode();
 
@@ -228,12 +228,12 @@ function getHeaderQRDA1($xml, $patient_id, $provider_id): void
 
     $xml->open_customTag('serviceEvent', ['classCode' => 'PCPR']);
 
-    $timeArr = ['low' => date('Ymdhis', strtotime((string) $from_date)), 'high' => date('Ymdhis', strtotime((string) $to_date))];
+    $timeArr = ['low' => date('YmdHis', strtotime((string) $from_date)), 'high' => date('YmdHis', strtotime((string) $to_date))];
     $xml->add_entryEffectTime($timeArr);
 
     $xml->open_customTag('performer', ['typeCode' => 'PRF']);
 
-    $timeArr = ['low' => date('Ymdhis', strtotime((string) $from_date)), 'high' => date('Ymdhis', strtotime((string) $to_date))];
+    $timeArr = ['low' => date('YmdHis', strtotime((string) $from_date)), 'high' => date('YmdHis', strtotime((string) $to_date))];
     $xml->add_entryTime($timeArr);
 
     $xml->open_customTag('assignedEntity');
@@ -400,7 +400,7 @@ function getAllImmunization($xml, $patient_id): void
                 $arr = ['code' => "completed"];
                 $xml->self_customTag('statusCode', $arr);
 
-                $timeArr = ['low' => date('Ymdhis', strtotime((string) $medRow['administered_date'])), 'high' => date('Ymdhis', strtotime((string) $medRow['administered_date']))];
+                $timeArr = ['low' => date('YmdHis', strtotime((string) $medRow['administered_date'])), 'high' => date('YmdHis', strtotime((string) $medRow['administered_date']))];
                 $xml->add_entryEffectTimeQRDAMed($timeArr);
 
                 $xml->open_customTag('entryRelationship', ['typeCode' => 'COMP']);
@@ -420,7 +420,7 @@ function getAllImmunization($xml, $patient_id): void
                 $arr = ['code' => $statusChk];
                 $xml->self_customTag('statusCode', $arr);
 
-                $timeArr = ['low' => date('Ymdhis', strtotime((string) $medRow['administered_date'])), 'high' => date('Ymdhis', strtotime((string) $medRow['administered_date']))];
+                $timeArr = ['low' => date('YmdHis', strtotime((string) $medRow['administered_date'])), 'high' => date('YmdHis', strtotime((string) $medRow['administered_date']))];
                 $xml->add_entryEffectTimeQRDAMed($timeArr);
 
             //consumable open
@@ -516,7 +516,7 @@ function getAllPhysicalExams($xml, $patient_id): void
                 $arr = ['code' => 'completed'];
                 $xml->self_customTag('statusCode', $arr);
 
-                $timeArr = ['low' => date('Ymdhis', strtotime((string) $vitRow['date'])), 'high' => date('Ymdhis', strtotime((string) $vitRow['date']))];
+                $timeArr = ['low' => date('YmdHis', strtotime((string) $vitRow['date'])), 'high' => date('YmdHis', strtotime((string) $vitRow['date']))];
                 $xml->add_entryEffectTimeQRDA($timeArr);
 
                 $xml->self_customTag('value', ['xsi:type' => 'PQ', 'value' => $vitRow[$measure_key], 'unit' => $measure['unit']]);
@@ -566,7 +566,7 @@ function getAllRiskCatAssessment($xml, $patient_id): void
             $arr = ['code' => 'completed'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $procRow['date_ordered'])), 'high' => date('Ymdhis', strtotime((string) $procRow['date_ordered']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $procRow['date_ordered'])), 'high' => date('YmdHis', strtotime((string) $procRow['date_ordered']))];
             $xml->add_entryEffectTimeQRDA($timeArr);
 
             $xml->self_customTag('value', ['xsi:type' => 'CD', 'nullFlavor' => 'UNK']);
@@ -622,7 +622,7 @@ function getAllProcedures($xml, $patient_id): void
             $arr = ['code' => 'completed'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $procRow['date_ordered'])), 'high' => date('Ymdhis', strtotime((string) $procRow['date_ordered']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $procRow['date_ordered'])), 'high' => date('YmdHis', strtotime((string) $procRow['date_ordered']))];
             $xml->add_entryEffectTimeQRDA($timeArr);
 
             //procedure Close
@@ -667,7 +667,7 @@ function getAllLabTests($xml, $patient_id): void
             $arr = ['code' => 'completed'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $procRow['date_ordered'])), 'high' => date('Ymdhis', strtotime((string) $procRow['date_ordered']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $procRow['date_ordered'])), 'high' => date('YmdHis', strtotime((string) $procRow['date_ordered']))];
             $xml->add_entryEffectTimeQRDA($timeArr);
 
             //procedure Close
@@ -716,7 +716,7 @@ function getAllInterventionProcedures($xml, $patient_id): void
             $arr = ['code' => 'completed'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $procRow['date_ordered'])), 'high' => date('Ymdhis', strtotime((string) $procRow['date_ordered']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $procRow['date_ordered'])), 'high' => date('YmdHis', strtotime((string) $procRow['date_ordered']))];
             $xml->add_entryEffectTimeQRDA($timeArr);
 
             //act Close
@@ -755,7 +755,7 @@ function getAllOrderMedications($xml, $patient_id): void
             $arr = ['code' => 'new'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $medRow['start_date'])), 'high' => date('Ymdhis', strtotime((string) $medRow['end_date']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $medRow['start_date'])), 'high' => date('YmdHis', strtotime((string) $medRow['end_date']))];
             $xml->add_entryEffectTimeQRDAMed($timeArr);
 
             /*if($medRow['enddate'] == ""){
@@ -840,7 +840,7 @@ function getAllActiveMedications($xml, $patient_id): void
             $arr = ['code' => 'active'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $medRow['start_date'])), 'high' => date('Ymdhis', strtotime((string) $medRow['end_date']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $medRow['start_date'])), 'high' => date('YmdHis', strtotime((string) $medRow['end_date']))];
             $xml->add_entryEffectTimeQRDAMed($timeArr);
 
             /*if($medRow['enddate'] == ""){
@@ -948,7 +948,7 @@ function getAllMedicalProbs($xml, $patient_id): void
             $arr = ['code' => "completed"];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $diagRow['begdate'])), 'high' => date('Ymdhis', strtotime((string) $endate))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $diagRow['begdate'])), 'high' => date('YmdHis', strtotime((string) $endate))];
             $xml->add_entryEffectTime($timeArr);
 
 
@@ -1028,7 +1028,7 @@ function getAllPatientEncounters($xml, $patient_id): void
             $arr = ['code' => 'completed'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $encRow['date'])), 'high' => date('Ymdhis', strtotime((string) $encRow['date']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $encRow['date'])), 'high' => date('YmdHis', strtotime((string) $encRow['date']))];
             $xml->add_entryEffectTime($timeArr);
 
             //Encounter Close
@@ -1067,7 +1067,7 @@ function getAllPatientEncounters($xml, $patient_id): void
             $arr = ['code' => 'completed'];
             $xml->self_customTag('statusCode', $arr);
 
-            $timeArr = ['low' => date('Ymdhis', strtotime((string) $encRow['date'])), 'high' => date('Ymdhis', strtotime((string) $encRow['date']))];
+            $timeArr = ['low' => date('YmdHis', strtotime((string) $encRow['date'])), 'high' => date('YmdHis', strtotime((string) $encRow['date']))];
             $xml->add_entryEffectTime($timeArr);
 
             //Encounter Close
@@ -1105,7 +1105,7 @@ function payerQRDA($xml, $patient_id): void
     $arr = ['code' => 'completed'];
     $xml->self_customTag('statusCode', $arr);
 
-    $timeArr = ['low' => date('Ymdhis', strtotime((string) $from_date)), 'high' => date('Ymdhis', strtotime((string) $to_date))];
+    $timeArr = ['low' => date('YmdHis', strtotime((string) $from_date)), 'high' => date('YmdHis', strtotime((string) $to_date))];
     $xml->add_entryEffectTime($timeArr);
 
     $xml->self_customTag('value', ['xsi:type' => 'CD', 'code' => $mainQrdaPayerCodeSendArr[$payer], 'codeSystem' => '2.16.840.1.113883.3.221.5' , 'codeSystemName' => 'Source of Payment Typology', 'displayName' => $payer]);
@@ -1156,7 +1156,7 @@ function getReportingParam($xml): void
     $arr = ['code' => '252116004', 'codeSystem' => '2.16.840.1.113883.6.96', 'displayName' => 'Observation Parameters'];
     $xml->self_codeCustom($arr);
 
-    $timeArr = ['low' => date('Ymdhis', strtotime((string) $from_date)), 'high' => date('Ymdhis', strtotime((string) $to_date))];
+    $timeArr = ['low' => date('YmdHis', strtotime((string) $from_date)), 'high' => date('YmdHis', strtotime((string) $to_date))];
     $xml->add_entryEffectTime($timeArr);
 
     $xml->close_act();
@@ -1337,7 +1337,7 @@ function patCharactersticQRDA($xml, $patient_id): void
         $arr = ['code' => 'completed'];
         $xml->self_customTag('statusCode', $arr);
 
-        $timeArr = ['low' => date('Ymdhis', strtotime((string) $patHist['date'])), 'high' => date('Ymdhis', strtotime((string) $patHist['date']))];
+        $timeArr = ['low' => date('YmdHis', strtotime((string) $patHist['date'])), 'high' => date('YmdHis', strtotime((string) $patHist['date']))];
         $xml->add_entryEffectTime($timeArr);
 
         $xml->self_customTag('value', ['xsi:type' => 'CD', 'code' => $vset['code'], 'codeSystem' => $vset['code_system'],'sdtc:valueSet' => $vset['valueset']]);

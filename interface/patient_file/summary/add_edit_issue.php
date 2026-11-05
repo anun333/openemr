@@ -264,7 +264,7 @@ if (!empty($_POST['form_save'])) {
     if ($issue) {
         $patientIssuesService->updateIssue($issueRecord);
     } else {
-        $issueRecord["date"] = date("Y-m-d H:m:s");
+        $issueRecord["date"] = date("Y-m-d H:i:s");
         $issueRecord['activity'] = 1;
         $issueRecord['user'] = $session->get('authUser');
         $issueRecord['groupname'] = $session->get('authProvider');
