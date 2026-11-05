@@ -19,6 +19,8 @@ $srcdir = \OpenEMR\Core\OEGlobalsBag::getInstance()->getSrcDir();
 require_once("$srcdir/../custom/code_types.inc.php");
 require_once("code_check.php");
 
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Forms\FeeSheet\Review\CodeInfo;
 use OpenEMR\Forms\FeeSheet\Review\EncounterInfo;
@@ -54,8 +56,9 @@ function update_issues($pid, $encounter, $diags): void
     $sqlFindProblem = "SELECT id, title FROM lists WHERE ";
     $sqlFindProblem .= " ( (`begdate` IS NULL) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) AND " ;
     array_push($lists_params, $target_date);
-    $sqlFindProblem .= " ( (`enddate` IS NULL) OR (`enddate` IS NOT NULL AND `enddate`>=?) ) ";
-    array_push($lists_params, $target_date);
+    // in force on the visit's date (not withdrawn, not ended: a zero end is no end), as issue_diagnoses() lists it
+    $sqlFindProblem .= InForce::issueSql() . " ";
+    array_push($lists_params, ...InForce::issueBindsStored($target_date));
     $sqlFindProblem .= "  AND pid=? AND diagnosis like ? ";
     array_push($lists_params, $pid);
     array_push($lists_params, "");
@@ -231,14 +234,16 @@ function create_procs($req_pid, $req_encounter, $procs): void
 function issue_diagnoses($pid, $encounter): array
 {
     $retval = [];
-    $parameters = [$encounter,$pid];
+    // Problems begun and in force now (not withdrawn, not ended: a zero end is no end).
+    $now = (new SiteClock())->now();
+    $parameters = [$encounter, $pid, $now->format('Y-m-d H:i:s'), ...InForce::issueBinds($now)];
     $sql = "SELECT l.diagnosis as diagnosis,l.title as title, NOT ISNULL(ie.encounter) as selected, l.id " .
           " FROM lists as l" .
           " LEFT JOIN issue_encounter as ie ON ie.list_id=l.id AND ie.encounter=?" .
           " WHERE l.type='medical_problem'" .
           " AND l.pid=?" . // 1st parameter pid
-          " AND ( (l.begdate IS NULL) OR (l.begdate IS NOT NULL AND l.begdate<=NOW()) ) AND " .
-          " ( ( l.enddate IS NULL) OR (l.enddate IS NOT NULL AND l.enddate>=NOW()) ) " .
+          " AND ( (l.begdate IS NULL) OR (l.begdate IS NOT NULL AND l.begdate<=?) ) AND " .
+          InForce::issueSql('l') .
           " ORDER BY ie.encounter DESC,l.id";
     $results = sqlStatement($sql, $parameters);
     while ($res = sqlFetchArray($results)) {

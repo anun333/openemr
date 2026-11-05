@@ -21,6 +21,8 @@ require_once(__DIR__ . "/options.inc.php");
 use OpenEMR\BC\ServiceContainer;
 use OpenEMR\ClinicalDecisionRules\AMC\CertificationReportTypes;
 use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\FacilityService;
@@ -306,15 +308,16 @@ function active_alert_summary($patient_id, $mode, $dateTarget = '', $organize_mo
 function allergy_conflict($patient_id, $mode, $user, $test = false)
 {
     $session = SessionWrapperFactory::getInstance()->getActiveSession();
-  // Collect allergies
+    $clock = new SiteClock();
+    $now = $clock->now();
+  // Collect allergies: not ended now (the shared rule's end; a zero end is no end). The alert keeps
+  // its own activity = 1, so an allergy saved with no activity (the CCR import) doesn't alert, as before.
     $sqlParam = [];
     $sqlParam[] = $patient_id;
     $res_allergies = sqlStatement("SELECT `title` FROM `lists` WHERE `type`='allergy' " .
                                 "AND `activity`=1 " .
-                                "AND ( " .
-                                dateEmptySql('enddate') .
-                                "OR `enddate` > NOW() ) " .
-                                "AND `pid`=?", $sqlParam);
+                                "AND " . InForce::issueNotEndedSql() . " " .
+                                "AND `pid`=?", [...InForce::issueBinds($now), ...$sqlParam]);
     $allergies = [];
     for ($iter = 0; $row = sqlFetchArray($res_allergies); $iter++) {
         $allergies[$iter] = $row['title'];
@@ -341,16 +344,16 @@ function allergy_conflict($patient_id, $mode, $user, $test = false)
         $sqlParam[] = $patient_id;
         $res_meds = sqlStatement("SELECT `title` FROM `lists` WHERE `type`='medication' " .
                              "AND `activity`=1 " .
-                             "AND ( " .
-                             dateEmptySql('enddate') .
-                             "OR `enddate` > NOW() )" .
-                             "AND `title` IN (" . $sqlIN . ") AND `pid`=?", $sqlParam);
+                             "AND " . InForce::issueNotEndedSql() . " " .
+                             "AND `title` IN (" . $sqlIN . ") AND `pid`=?", [...InForce::issueBinds($now), ...$sqlParam]);
         while ($urow = sqlFetchArray($res_meds)) {
               $conflicts[] = $urow['title'];
         }
 
-        $res_rx = sqlStatement("SELECT `drug` FROM `prescriptions` WHERE `active`=1 " .
-                           "AND `drug` IN (" . $sqlIN . ") AND `patient_id`=?", $sqlParam);
+        // Prescriptions in force today: active, and not past their end date (an imported or API
+        // prescription whose course ended no longer alerts).
+        $res_rx = sqlStatement("SELECT `drug` FROM `prescriptions` WHERE " . InForce::prescriptionSql() . " " .
+                           "AND `drug` IN (" . $sqlIN . ") AND `patient_id`=?", [...InForce::prescriptionBinds($clock->today()), ...$sqlParam]);
         while ($urow = sqlFetchArray($res_rx)) {
               $conflicts[] = $urow['drug'];
         }
@@ -2960,6 +2963,8 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
 
     // Set date to current if not set
     $dateTarget = $dateTarget ?: date('Y-m-d H:i:s');
+    // The issue must be in force at the target (not withdrawn, not ended: a zero end is no end) and have begun by it;
+    // the target is bound as given, as before.
 
     // Attempt to explode the value into a code type and code (if applicable)
     $value_array = explode("::", $value);
@@ -2984,7 +2989,7 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
                 "AND `pid`=? " .
                 "AND `title` $sqloper " .
                 "AND ( (`begdate` IS NULL AND `date`<=?) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) " .
-                "AND ( (`enddate` IS NULL) OR (`enddate` IS NOT NULL AND `enddate`>=?) )", [$type,$patient_id,$code,$dateTarget,$dateTarget,$dateTarget]);
+                "AND " . InForce::issueSql(), [$type,$patient_id,$code,$dateTarget,$dateTarget,...InForce::issueBindsStored($dateTarget)]);
             if (!empty($response)) {
                 return true;
             }
@@ -2995,7 +3000,7 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
                 "AND `pid`=? " .
                 "AND `diagnosis` LIKE ? " .
                 "AND ( (`begdate` IS NULL AND `date`<=?) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) " .
-                "AND ( (`enddate` IS NULL) OR (`enddate` IS NOT NULL AND `enddate`>=?) )", [$type,$patient_id,"%" . $code_type . ":" . $code . "%",$dateTarget,$dateTarget,$dateTarget]);
+                "AND " . InForce::issueSql(), [$type,$patient_id,"%" . $code_type . ":" . $code . "%",$dateTarget,$dateTarget,...InForce::issueBindsStored($dateTarget)]);
             if (!empty($response)) {
                 return true;
             }
@@ -3017,7 +3022,7 @@ function exist_lists_item($patient_id, $type, $value, $dateTarget): bool
             "AND `pid`=? " .
             "AND `title` $sqloper " .
             "AND ( (`begdate` IS NULL AND `date`<=?) OR (`begdate` IS NOT NULL AND `begdate`<=?) ) " .
-            "AND ( (`enddate` IS NULL) OR (`enddate` IS NOT NULL AND `enddate`>=?) )", [$type,$patient_id,$value,$dateTarget,$dateTarget,$dateTarget]);
+            "AND " . InForce::issueSql(), [$type,$patient_id,$value,$dateTarget,$dateTarget,...InForce::issueBindsStored($dateTarget)]);
         if (!empty($response)) {
             return true;
         }
