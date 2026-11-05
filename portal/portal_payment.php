@@ -1027,7 +1027,7 @@ if ($alertmsg === '' && (($_POST['form_save'] ?? null) || filter_input(INPUT_GET
                 // levels on file compared with the last level closed.
                 $levelsInForce = count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
                     is_numeric($pid) ? (int)$pid : 0,
-                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($dispdate) ? $dispdate : null)
+                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($dispdate)
                 ));
                 $duept = 0;
                 if ((($levelsInForce == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) { // Patient balance

@@ -968,7 +968,7 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_export']) || !empty($_
         $collectionsPolicyOn = static function (mixed $patientId, string $type, mixed $day): array {
             $rows = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
                 is_numeric($patientId) ? (int)$patientId : 0,
-                (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($day) ? $day : null)
+                (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($day)
             );
             foreach ($rows as $row) {
                 if ($row->policy->level->value === $type) {
