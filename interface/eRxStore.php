@@ -14,6 +14,8 @@
  */
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 
 class eRxStore
 {
@@ -156,11 +158,8 @@ class eRxStore
 				AND pid = ?
 				AND erx_source = \'0\'
 				AND erx_uploaded = \'0\'
-				AND (
-					enddate is NULL
-					OR enddate = \'0000-00-00\'
-				);',
-            [$patientId]
+				AND ' . InForce::issueSql('lists') . ';',
+            [$patientId, ...InForce::issueBinds((new SiteClock())->now())]
         );
     }
 
@@ -169,7 +168,7 @@ class eRxStore
         // Newest onset first: PatientDiagnosisList keeps the first row per code.
         return QueryUtils::sqlStatementThrowException(
             <<<'SQL'
-            SELECT diagnosis, begdate, enddate, title, date
+            SELECT diagnosis, begdate, enddate, title, date, activity
             FROM lists
             WHERE `type` = 'medical_problem'
                 AND pid = ?
@@ -297,15 +296,14 @@ class eRxStore
 				AND title <> \'\'
 				AND erx_uploaded = \'0\'
 				AND (? = 0
-					OR (enddate IS NULL
-						OR enddate = \'0000-00-00\'
-						)
+					OR ' . InForce::issueSql() . '
 					)
 			ORDER BY enddate
 			LIMIT 0, ?;',
             [
                 $patientId,
                 $uploadActive,
+                ...InForce::issueBinds((new SiteClock())->now()),
                 $limit
             ]
         );
@@ -320,11 +318,12 @@ class eRxStore
 				AND erx_source = \'0\'
 				AND erx_uploaded = \'0\'
 				AND (? = 0
-					OR active = 1
+					OR ' . InForce::prescriptionSql() . '
 				) LIMIT 0, ?;',
             [
                 $patientId,
                 $uploadActive,
+                ...InForce::prescriptionBinds((new SiteClock())->today()),
                 $limit,
             ]
         );

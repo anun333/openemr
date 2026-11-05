@@ -19,6 +19,10 @@ declare(strict_types=1);
 
 namespace OpenEMR\Rx\Ensora;
 
+use DateTimeInterface;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
+
 final class PatientDiagnosisList
 {
     /** NCScript's maxOccurs for PatientDiagnosis. */
@@ -31,15 +35,18 @@ final class PatientDiagnosisList
      * Keep active ICD-10 codes, once each, up to MAX_DIAGNOSES. The first row
      * seen for a code wins, so pass rows newest onset first.
      *
-     * @param iterable<mixed> $rows `lists` rows with diagnosis, begdate, enddate, title, date
+     * @param iterable<mixed> $rows `lists` rows with diagnosis, begdate, enddate, title, date, activity
+     * @param ?DateTimeInterface $at the moment a problem must be in force at (now when not given)
      * @return list<PatientDiagnosis>
      */
-    public static function fromProblemRows(iterable $rows): array
+    public static function fromProblemRows(iterable $rows, ?DateTimeInterface $at = null): array
     {
+        $at ??= (new SiteClock())->now();
         $diagnoses = [];
         $seen = [];
         foreach ($rows as $row) {
-            if (!is_array($row) || !self::isActive($row['enddate'] ?? null)) {
+            // in force at that moment: not withdrawn, not ended (a future end is still active; a zero end is no end)
+            if (!is_array($row) || !InForce::issue($row, $at)) {
                 continue;
             }
             $codes = $row['diagnosis'] ?? null;
@@ -66,14 +73,6 @@ final class PatientDiagnosisList
         }
 
         return $diagnoses;
-    }
-
-    /** A zero date is legacy data for "no end date", as in the allergy import. */
-    private static function isActive(mixed $endDate): bool
-    {
-        return $endDate === null
-            || $endDate === ''
-            || (is_string($endDate) && str_starts_with($endDate, '0000-00-00'));
     }
 
     private static function compactDate(mixed $value): ?string

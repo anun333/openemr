@@ -95,7 +95,16 @@ class PatientDiagnosisListTest extends TestCase
             'empty end date' => ['', true],
             'zero end date' => ['0000-00-00 00:00:00', true],
             'resolved' => ['2025-01-01 00:00:00', false],
+            // in force until its end: a problem with an end date ahead is still active
+            'an end date ahead' => ['2999-01-01 00:00:00', true],
         ];
+    }
+
+    public function testAWithdrawnProblemIsNotSent(): void
+    {
+        $diagnoses = PatientDiagnosisList::fromProblemRows([self::row('ICD10:E11.9') + ['activity' => '0']]);
+
+        $this->assertSame([], self::codes($diagnoses));
     }
 
     #[DataProvider('endDateProvider')]
