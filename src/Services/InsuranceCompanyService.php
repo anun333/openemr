@@ -20,6 +20,7 @@ use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Common\Database\SqlQueryException;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Services\Address\AddressData;
+use OpenEMR\Services\Insurance\InsuranceTables;
 use OpenEMR\Services\{
     AddressService,
     PhoneNumberService,
@@ -34,7 +35,7 @@ use OpenEMR\BC\ServiceContainer;
 
 class InsuranceCompanyService extends BaseService
 {
-    private const INSURANCE_TABLE = "insurance_companies";
+    private const INSURANCE_TABLE = InsuranceTables::PAYERS;
     private readonly InsuranceCompanyValidator $insuranceCompanyValidator;
     private readonly AddressService $addressService;
     private $phoneNumberService = null;
@@ -128,69 +129,10 @@ class InsuranceCompanyService extends BaseService
         // from since OpenEMR mixes a bunch of paradigms.  I initially worried about data corruption as phone_numbers
         // foreign id could be ambiguous here... but since the sequence is globally unique @see \generate_id() we can
         // join here safely...
-        $sql = <<<'SQL'
-            SELECT i.id,
-                i.uuid,
-                i.name,
-                i.attn,
-                i.cms_id,
-                i.ins_type_code,
-                i.x12_receiver_id,
-                i.x12_default_partner_id,
-                x12.x12_default_partner_name,
-                i.alt_cms_id,
-                i.inactive,
-                work_number.work_id,
-                fax_number.fax_id,
-                CONCAT(
-                    COALESCE(work_number.country_code, ''),
-                    COALESCE(work_number.area_code, ''),
-                    COALESCE(work_number.prefix, ''),
-                    work_number.number
-                ) AS work_number,
-                CONCAT(
-                    COALESCE(fax_number.country_code, ''),
-                    COALESCE(fax_number.area_code, ''),
-                    COALESCE(fax_number.prefix, ''),
-                    fax_number.number
-                ) AS fax_number,
-                a.line1,
-                a.line2,
-                a.city,
-                a.state,
-                a.zip,
-                a.plus_four,
-                a.country,
-                i.date_created,
-                i.last_updated
-            FROM insurance_companies i
-            LEFT JOIN (
-                SELECT line1, line2, city, state, zip, plus_four, country, foreign_id
-                FROM addresses
-            ) a ON i.id = a.foreign_id
-            LEFT JOIN (
-                SELECT id AS work_id, foreign_id, country_code, area_code, prefix, number
-                FROM phone_numbers
-                WHERE number IS NOT NULL AND type = ?
-            ) work_number ON i.id = work_number.foreign_id
-            LEFT JOIN (
-                SELECT id AS fax_id, foreign_id, country_code, area_code, prefix, number
-                FROM phone_numbers
-                WHERE number IS NOT NULL AND type = ?
-            ) fax_number ON i.id = fax_number.foreign_id
-            LEFT JOIN (
-                SELECT id AS x12_default_partner_id, name AS x12_default_partner_name
-                FROM x12_partners
-            ) x12 ON i.x12_default_partner_id = x12.x12_default_partner_id
-            SQL;
-        $typeBindings = [PhoneType::WORK->value, PhoneType::FAX->value];
-
         $processingResult = new ProcessingResult();
         try {
             $whereFragment = FhirSearchWhereClauseBuilder::build($search, $isAndCondition);
-            $sql .= $whereFragment->getFragment();
-            $boundValues = array_merge($typeBindings, $whereFragment->getBoundValues());
-            $records = QueryUtils::fetchRecords($sql, $boundValues);
+            $records = ServiceContainer::getInsurancePayer()->searchRows($whereFragment->getFragment(), $whereFragment->getBoundValues());
 
             foreach ($records as $row) {
                 $resultRecord = $this->createResultRecordFromDatabaseResult($row);
@@ -231,38 +173,7 @@ class InsuranceCompanyService extends BaseService
             $search['id'] = $this->getIdByUuid($uuidBytes, self::INSURANCE_TABLE, "id");
         }
 
-        $sqlBindArray = [];
-        $sql = " SELECT i.id,";
-        $sql .= "        i.uuid,";
-        $sql .= "        i.name,";
-        $sql .= "        i.attn,";
-        $sql .= "        i.cms_id,";
-        $sql .= "        i.ins_type_code,";
-        $sql .= "        i.x12_receiver_id,";
-        $sql .= "        i.x12_default_partner_id,";
-        $sql .= "        i.alt_cms_id,";
-        $sql .= "        i.inactive,";
-        $sql .= "        a.line1,";
-        $sql .= "        a.line2,";
-        $sql .= "        a.city,";
-        $sql .= "        a.state,";
-        $sql .= "        a.zip,";
-        $sql .= "        a.country";
-        $sql .= " FROM insurance_companies i";
-        $sql .= " LEFT JOIN addresses a ON i.id = a.foreign_id";
-
-        if ($search !== []) {
-            $sql .= ' AND ';
-            $whereClauses = [];
-            foreach ($search as $fieldName => $fieldValue) {
-                array_push($whereClauses, $fieldName . ' = ?');
-                array_push($sqlBindArray, $fieldValue);
-            }
-            $sqlCondition = ($isAndCondition == true) ? 'AND' : 'OR';
-            $sql .= implode(' ' . $sqlCondition . ' ', $whereClauses);
-        }
-
-        $statementResults = sqlStatement($sql, $sqlBindArray);
+        $statementResults = ServiceContainer::getInsurancePayer()->allStatement($search, $isAndCondition);
 
         $processingResult = new ProcessingResult();
         while ($row = sqlFetchArray($statementResults)) {
@@ -276,8 +187,7 @@ class InsuranceCompanyService extends BaseService
     {
         // TODO: this should be refactored to use getAll but its selecting all the columns and for backwards
         // compatibility we will leave this here.
-        $sql = "SELECT * FROM insurance_companies WHERE id=?";
-        $row = sqlQuery($sql, [$id]);
+        $row = ServiceContainer::getInsurancePayer()->rowById($id);
         // uuid is binary(16); hand it back as a string so the REST API can json_encode the row
         if (is_array($row) && is_string($row['uuid'] ?? null) && $row['uuid'] !== '') {
             $row['uuid'] = UuidRegistry::uuidToString($row['uuid']);
@@ -459,22 +369,8 @@ class InsuranceCompanyService extends BaseService
             throw new \RuntimeException(xl('Invalid insurance company id'));
         }
 
-        $sql = " INSERT INTO insurance_companies SET";
-        $sql .= "     id=?,";
-        $sql .= "     uuid=?,";
-        $sql .= "     name=?,";
-        $sql .= "     attn=?,";
-        $sql .= "     cms_id=?,";
-        $sql .= "     ins_type_code=?,";
-        $sql .= "     x12_receiver_id=?,";
-        $sql .= "     x12_default_partner_id=?,";
-        $sql .= "     alt_cms_id=?,";
-        $sql .= "     cqm_sop=?,";
-        $sql .= "     inactive=?";
-
         // throws an exception if the record doesn't insert
-        QueryUtils::sqlInsert(
-            $sql,
+        ServiceContainer::getInsurancePayer()->insertPayer(
             [
                 $freshId,
                 UuidRegistry::getRegistryForTable(self::INSURANCE_TABLE)->createUuid(),
@@ -514,19 +410,7 @@ class InsuranceCompanyService extends BaseService
         /** @var array<string, mixed> $data */
         $data = array_merge($existing, $data);
 
-        $sql = " UPDATE insurance_companies SET";
-        $sql .= "     name=?,";
-        $sql .= "     attn=?,";
-        $sql .= "     cms_id=?,";
-        $sql .= "     ins_type_code=?,";
-        $sql .= "     x12_receiver_id=?,";
-        $sql .= "     x12_default_partner_id=?,";
-        $sql .= "     alt_cms_id=?,";
-        $sql .= "     cqm_sop=?";
-        $sql .= "     WHERE id = ?";
-
-        $insuranceResults = sqlStatement(
-            $sql,
+        $insuranceResults = ServiceContainer::getInsurancePayer()->updatePayer(
             [
                 $data["name"],
                 $data["attn"],
@@ -599,19 +483,17 @@ class InsuranceCompanyService extends BaseService
 
     // ---- Payer reads: the one door for company data -----------------------------------------------
     //
-    // What callers outside the insurance services ask about a company (a payer), each the query they
-    // ran before the boundary branch, moved here unchanged. Static: a read needs none of the
-    // constructor's setup, which backfills missing uuids (a write). No permission checks: each caller
-    // keeps its own. A $columns or $where argument is SQL over the aliases named; callers pass literals
-    // or values they have already escaped, as before.
+    // What callers outside the insurance services ask about a company (a payer). The queries are the
+    // insurance module's (Payers\PayerRecords); these keep the names callers use and delegate through
+    // the payer contract (ServiceContainer::getInsurancePayer()). No permission checks: each caller
+    // keeps its own.
 
     /**
      * A company's stored name, or null when no company has the id.
      */
     public static function nameOf(mixed $id): mixed
     {
-        $row = QueryUtils::querySingleRow("SELECT name FROM insurance_companies WHERE id = ?", [$id]);
-        return is_array($row) ? $row['name'] : null;
+        return ServiceContainer::getInsurancePayer()->nameOf($id);
     }
 
     /**
@@ -623,20 +505,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function namesOf(array $ids): array
     {
-        $ids = array_values(array_unique(array_filter($ids, fn($id): bool => is_int($id) || (is_string($id) && $id !== ''))));
-        $names = [];
-        foreach (array_chunk($ids, 1000) as $chunk) {
-            $rows = QueryUtils::fetchRecords(
-                "SELECT id, name FROM insurance_companies WHERE id IN (" . implode(',', array_fill(0, count($chunk), '?')) . ")",
-                $chunk
-            );
-            foreach ($rows as $row) {
-                if (is_int($row['id']) || is_string($row['id'])) {
-                    $names[$row['id']] = $row['name'];
-                }
-            }
-        }
-        return $names;
+        return ServiceContainer::getInsurancePayer()->namesOf($ids);
     }
 
     /**
@@ -647,7 +516,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function nameFrom(array $names, mixed $id): mixed
     {
-        return is_int($id) || is_string($id) ? ($names[$id] ?? null) : null;
+        return ServiceContainer::getInsurancePayer()->nameFrom($names, $id);
     }
 
     /**
@@ -659,7 +528,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function columnsOf(mixed $id, string $columns = '*'): array|false
     {
-        return QueryUtils::querySingleRow("SELECT $columns FROM insurance_companies WHERE id = ?", [$id]);
+        return ServiceContainer::getInsurancePayer()->columnsOf($id, $columns);
     }
 
     /**
@@ -667,7 +536,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function idByUuid(string $uuidBytes): mixed
     {
-        return QueryUtils::fetchSingleValue("SELECT id FROM insurance_companies WHERE uuid = ?", 'id', [$uuidBytes]);
+        return ServiceContainer::getInsurancePayer()->idByUuid($uuidBytes);
     }
 
     /**
@@ -678,7 +547,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function newestActiveBySourceOfPayment(mixed $code): array
     {
-        return QueryUtils::fetchRecords("SELECT `id`, `uuid` FROM `insurance_companies` WHERE `cqm_sop` = ? AND `inactive` = 0 ORDER BY `id` DESC LIMIT 1", [$code]);
+        return ServiceContainer::getInsurancePayer()->newestActiveBySourceOfPayment($code);
     }
 
     /**
@@ -689,7 +558,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function payerTypes(): array
     {
-        return QueryUtils::fetchRecords("SELECT id, name, cqm_sop, ins_type_code FROM insurance_companies ORDER BY name");
+        return ServiceContainer::getInsurancePayer()->payerTypes();
     }
 
     /**
@@ -700,13 +569,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function activeNamesById(): array
     {
-        $returnval = [];
-        foreach (QueryUtils::fetchRecords("select name, id from insurance_companies where inactive != 1 order by name, id") as $row) {
-            if (is_int($row['id']) || is_string($row['id'])) {
-                $returnval[$row['id']] = $row['name'];
-            }
-        }
-        return $returnval;
+        return ServiceContainer::getInsurancePayer()->activeNamesById();
     }
 
     /**
@@ -719,20 +582,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function namesWithZipById(): array
     {
-        $returnval = [];
-        $sql = "select insurance_companies.name, insurance_companies.id, " .
-          "addresses.zip, addresses.line1 " .
-          "from insurance_companies, addresses " .
-          "where addresses.foreign_id = insurance_companies.id " .
-          "order by insurance_companies.name, addresses.zip";
-        foreach (QueryUtils::fetchRecords($sql) as $row) {
-            preg_match("/\d+/", is_string($row['line1']) ? $row['line1'] : '', $matches);
-            if (is_int($row['id']) || is_string($row['id'])) {
-                $returnval[$row['id']] = (is_string($row['name']) ? $row['name'] : '') . " (" . (is_string($row['zip']) ? $row['zip'] : '') .
-                  "," . ($matches[0] ?? '') . ")";
-            }
-        }
-        return $returnval;
+        return ServiceContainer::getInsurancePayer()->namesWithZipById();
     }
 
     /**
@@ -743,13 +593,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function activeWithAddress(): array
     {
-        $sql = "SELECT insurance_companies.name, insurance_companies.id, insurance_companies.cms_id,
-            addresses.line1, addresses.line2, addresses.city, addresses.state, addresses.zip
-            FROM insurance_companies, addresses
-            WHERE addresses.foreign_id = insurance_companies.id
-            AND insurance_companies.inactive != 1
-            ORDER BY insurance_companies.name, addresses.zip";
-        return QueryUtils::fetchRecords($sql);
+        return ServiceContainer::getInsurancePayer()->activeWithAddress();
     }
 
     /**
@@ -760,8 +604,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function searchByNameOrIdPrefix(string $text): array
     {
-        return QueryUtils::fetchRecords("SELECT insurance_companies.id,name,city,state,country FROM insurance_companies
-			left join addresses on insurance_companies.id=addresses.foreign_id  where name like ? or  insurance_companies.id like ? ORDER BY name", [$text . '%', $text . '%']);
+        return ServiceContainer::getInsurancePayer()->searchByNameOrIdPrefix($text);
     }
 
     /**
@@ -773,15 +616,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function searchForPractice(string $where): array
     {
-        $query = "SELECT " .
-            "i.id, i.name, i.attn, " .
-            "a.line1, a.line2, a.city, a.state, a.zip, " .
-            "p.area_code, p.prefix, p.number " .
-            "FROM insurance_companies i " .
-            "LEFT JOIN addresses a ON a.foreign_id = i.id " .
-            "LEFT JOIN phone_numbers p ON p.foreign_id = i.id WHERE 1=1 ";
-        $query .= $where . " ORDER BY i.name, a.zip";
-        return QueryUtils::fetchRecords($query);
+        return ServiceContainer::getInsurancePayer()->searchForPractice($where);
     }
 
     /**
@@ -789,10 +624,7 @@ class InsuranceCompanyService extends BaseService
      */
     public static function setClaimTemplate(mixed $id, mixed $templateJson): void
     {
-        QueryUtils::sqlStatementThrowException("update insurance_companies set claim_template = ? where id = ?", [
-            $templateJson,
-            $id
-        ]);
+        ServiceContainer::getInsurancePayer()->setClaimTemplate($id, $templateJson);
     }
 
     /**

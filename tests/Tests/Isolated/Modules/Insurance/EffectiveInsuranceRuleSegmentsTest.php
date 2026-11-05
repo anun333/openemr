@@ -12,12 +12,13 @@
 
 declare(strict_types=1);
 
-namespace OpenEMR\Tests\Isolated\Services\Insurance;
+namespace OpenEMR\Tests\Isolated\Modules\Insurance;
 
+use Composer\Autoload\ClassLoader;
 use DateTimeImmutable;
 use DateTimeZone;
+use OpenEMR\Modules\Insurance\Policies\EffectiveInsuranceRule;
 use OpenEMR\Services\Insurance\CoverageSegment;
-use OpenEMR\Services\Insurance\EffectiveInsuranceRule;
 use OpenEMR\Services\Insurance\InsuranceLevel;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -27,6 +28,25 @@ final class EffectiveInsuranceRuleSegmentsTest extends TestCase
 {
     private const FROM = '2025-11-15';
     private const TO = '2026-04-30';
+
+    /**
+     * The module's namespace, which core's composer.json doesn't map: registered as the module's own definitions
+     * do (config/services.php), so the rule can be tested alone.
+     *
+     * @codeCoverageIgnore Fixture wiring; runs before coverage attribution.
+     */
+    public static function setUpBeforeClass(): void
+    {
+        $loaders = ClassLoader::getRegisteredLoaders();
+        $loader = reset($loaders);
+        if (!$loader instanceof ClassLoader) {
+            self::fail('Composer ClassLoader not available to register module autoload prefix.');
+        }
+        $loader->addPsr4(
+            'OpenEMR\\Modules\\Insurance\\',
+            dirname(__DIR__, 5) . '/interface/modules/custom_modules/oe-module-insurance/src/'
+        );
+    }
 
     /**
      * An insurance_data row as a read with bound values returns it: id as an int, the rest as stored.

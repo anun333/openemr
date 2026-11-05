@@ -27,8 +27,8 @@ use OpenEMR\Services\Insurance\CoverageDay;
 use OpenEMR\Services\Insurance\CoverageSegment;
 use OpenEMR\Services\Insurance\EffectiveInsurance;
 use OpenEMR\Services\Insurance\EffectiveInsuranceRow;
-use OpenEMR\Services\Insurance\EffectiveInsuranceRule;
 use OpenEMR\Services\Insurance\InsuranceLevel;
+use OpenEMR\Services\Insurance\InsuranceTables;
 use OpenEMR\Services\Search\{
     CompositeSearchField,
     DateSearchField,
@@ -45,9 +45,9 @@ use OpenEMR\Validators\{
 
 class InsuranceService extends BaseService
 {
-    private const COVERAGE_TABLE = "insurance_data";
+    private const COVERAGE_TABLE = InsuranceTables::POLICIES;
     private const PATIENT_TABLE = "patient_data";
-    private const INSURANCE_TABLE = "insurance_companies";
+    private const INSURANCE_TABLE = InsuranceTables::PAYERS;
     /**
      * @var CoverageValidator $coverageValidator
      */
@@ -77,46 +77,13 @@ class InsuranceService extends BaseService
 
     public function getOneByPid($id, $type)
     {
-        $sql = "SELECT * FROM insurance_data WHERE pid=? AND type=?";
-        return sqlQuery($sql, [$id, $type]);
+        return ServiceContainer::getInsuranceCoverage()->rowByPidAndType($id, $type);
     }
 
     public function search(array $search, $isAndCondition = true): ProcessingResult
     {
-        $sql = "SELECT `insurance_data`.*,
-                       `puuid`,
-                       `insureruuid`,
-                       `ins_type_code`,
-                       `cqm_sop`
-                FROM `insurance_data`
-                LEFT JOIN (
-                    SELECT
-                    `uuid` AS `insureruuid`,
-                    `id` AS `insurerid`,
-                    `ins_type_code`,
-                    `cqm_sop`
-                    FROM `insurance_companies`
-                    ) `insurance_company_data` ON `insurance_data`.`provider` = `insurance_company_data`.`insurerid`
-                LEFT JOIN (
-                    SELECT
-                    `pid` AS `patient_data_pid`,
-                    `uuid` AS `puuid`
-                    FROM `patient_data`
-                ) `patient_data` ON `insurance_data`.`pid` = `patient_data`.`patient_data_pid` ";
-
         $whereClause = FhirSearchWhereClauseBuilder::build($search, $isAndCondition);
-
-        // Twin (insurance-reference): the policy in force today first, as the coverage
-        // service decides it (both ends inclusive, a blank or zero end open), then the
-        // latest start. Master put any open or future end first, so next year's card
-        // led the list the policy editor and the demographics card open on.
-        $orderClause = " ORDER BY `patient_data_pid` ASC,`type` ASC"
-        . ", ((`date` IS NULL OR `date` <= CURDATE()) AND (`date_end` IS NULL OR `date_end` = '0000-00-00' OR `date_end` >= CURDATE())) DESC"
-        . ", `date` DESC, `date_end` DESC, `policy_number` ASC";
-
-        $sql .= $whereClause->getFragment() . $orderClause;
-        $sqlBindArray = $whereClause->getBoundValues();
-        $statementResults =  QueryUtils::sqlStatementThrowException($sql, $sqlBindArray);
+        $statementResults = ServiceContainer::getInsuranceCoverage()->searchStatement($whereClause->getFragment(), $whereClause->getBoundValues());
 
         $processingResult = new ProcessingResult();
         while ($row = sqlFetchArray($statementResults)) {
@@ -135,9 +102,7 @@ class InsuranceService extends BaseService
             return $isValid;
         }
         $uuidBytes = UuidRegistry::uuidToBytes($uuid);
-        $sql = "SELECT * FROM insurance_data WHERE uuid=? ";
-
-        $sqlResult = sqlQuery($sql, [$uuidBytes]);
+        $sqlResult = ServiceContainer::getInsuranceCoverage()->rowByUuid($uuidBytes);
         if ($sqlResult) {
             $sqlResult['uuid'] = UuidRegistry::uuidToString($sqlResult['uuid']);
             $processingResult->addData($sqlResult);
@@ -150,9 +115,9 @@ class InsuranceService extends BaseService
     public function doesInsuranceTypeHaveEntry($pid, $type = '')
     {
         if (!empty($type)) {
-            return sqlQuery("Select `id` From `insurance_data` Where pid = ? And type = ?", [$pid, $type])['id'] ?? null;
+            return ServiceContainer::getInsuranceCoverage()->idAtLevel($pid, $type);
         }
-        return QueryUtils::fetchSingleValue("SELECT `id` FROM `insurance_data` WHERE `pid` = ? LIMIT 1", 'id', [$pid]) !== null;
+        return ServiceContainer::getInsuranceCoverage()->hasPolicy($pid);
     }
 
     public function update($data): ProcessingResult
@@ -203,11 +168,7 @@ class InsuranceService extends BaseService
         $callerUuid = is_array($data) ? ($data['uuid'] ?? null) : null;
         if (is_numeric($callerPid) && is_string($callerUuid) && $callerUuid !== '') {
             $uuidBinaryCheck = UuidRegistry::uuidToBytes($callerUuid);
-            $rowPidRaw = QueryUtils::fetchSingleValue(
-                "SELECT pid FROM insurance_data WHERE uuid = ?",
-                'pid',
-                [$uuidBinaryCheck]
-            );
+            $rowPidRaw = ServiceContainer::getInsuranceCoverage()->pidByUuid($uuidBinaryCheck);
             if (!is_numeric($rowPidRaw) || (int) $rowPidRaw !== (int) $callerPid) {
                 $notFound = new ProcessingResult();
                 $notFound->setValidationMessages(['uuid' => 'Insurance policy not found']);
@@ -215,45 +176,12 @@ class InsuranceService extends BaseService
             }
         }
 
-        $sql = " UPDATE insurance_data SET ";
-        $sql .= "   provider=?,";
-        $sql .= "   plan_name=?,";
-        $sql .= "   policy_number=?,";
-        $sql .= "   group_number=?,";
-        $sql .= "   subscriber_lname=?,";
-        $sql .= "   subscriber_mname=?,";
-        $sql .= "   subscriber_fname=?,";
-        $sql .= "   subscriber_relationship=?,";
-        $sql .= "   subscriber_ss=?,";
-        $sql .= "   subscriber_DOB=?,";
-        $sql .= "   subscriber_street=?,";
-        $sql .= "   subscriber_postal_code=?,";
-        $sql .= "   subscriber_city=?,";
-        $sql .= "   subscriber_state=?,";
-        $sql .= "   subscriber_country=?,";
-        $sql .= "   subscriber_phone=?,";
-        $sql .= "   subscriber_employer=?,";
-        $sql .= "   subscriber_employer_street=?,";
-        $sql .= "   subscriber_employer_postal_code=?,";
-        $sql .= "   subscriber_employer_state=?,";
-        $sql .= "   subscriber_employer_country=?,";
-        $sql .= "   subscriber_employer_city=?,";
-        $sql .= "   copay=?,";
-        $sql .= "   date=?,";
-        $sql .= "   date_end=?,";
-        $sql .= "   subscriber_sex=?,";
-        $sql .= "   accept_assignment=?,";
-        $sql .= "   policy_type=?,";
-        $sql .= "   type=?";
-        $sql .= "   WHERE uuid = ? ";
-
         $serviceSaveEvent = new ServiceSaveEvent($this, $data);
         $this->getEventDispatcher()->dispatch($serviceSaveEvent, ServiceSaveEvent::EVENT_PRE_SAVE);
         $data = $serviceSaveEvent->getSaveData();
         $uuid = UuidRegistry::uuidToBytes($data['uuid']);
 
-        $results = sqlStatement(
-            $sql,
+        $results = ServiceContainer::getInsuranceCoverage()->updateByUuid(
             [
                 $data["provider"],
                 $data["plan_name"],
@@ -306,39 +234,6 @@ class InsuranceService extends BaseService
 
         $data['uuid'] = UuidRegistry::getRegistryForTable(self::COVERAGE_TABLE)->createUuid();
 
-        $sql = " INSERT INTO insurance_data SET ";
-        $sql .= "   uuid=?,";
-        $sql .= "   type=?,";
-        $sql .= "   provider=?,";
-        $sql .= "   plan_name=?,";
-        $sql .= "   policy_number=?,";
-        $sql .= "   group_number=?,";
-        $sql .= "   subscriber_lname=?,";
-        $sql .= "   subscriber_mname=?,";
-        $sql .= "   subscriber_fname=?,";
-        $sql .= "   subscriber_relationship=?,";
-        $sql .= "   subscriber_ss=?,";
-        $sql .= "   subscriber_DOB=?,";
-        $sql .= "   subscriber_street=?,";
-        $sql .= "   subscriber_postal_code=?,";
-        $sql .= "   subscriber_city=?,";
-        $sql .= "   subscriber_state=?,";
-        $sql .= "   subscriber_country=?,";
-        $sql .= "   subscriber_phone=?,";
-        $sql .= "   subscriber_employer=?,";
-        $sql .= "   subscriber_employer_street=?,";
-        $sql .= "   subscriber_employer_postal_code=?,";
-        $sql .= "   subscriber_employer_state=?,";
-        $sql .= "   subscriber_employer_country=?,";
-        $sql .= "   subscriber_employer_city=?,";
-        $sql .= "   copay=?,";
-        $sql .= "   date=?,";
-        $sql .= "   date_end=?,";
-        $sql .= "   pid=?,";
-        $sql .= "   subscriber_sex=?,";
-        $sql .= "   accept_assignment=?,";
-        $sql .= "   policy_type=?";
-
         $serviceSaveEvent = new ServiceSaveEvent($this, $data);
         $dispatchedEvent = $this->getEventDispatcher()->dispatch($serviceSaveEvent, ServiceSaveEvent::EVENT_PRE_SAVE);
         $data = $dispatchedEvent->getSaveData();
@@ -346,8 +241,7 @@ class InsuranceService extends BaseService
         $dateEnd = $data['date_end'] ?? null;
         $dateEnd = is_string($dateEnd) && $dateEnd !== '' ? $dateEnd : null;
 
-        $insuranceDataId = sqlInsert(
-            $sql,
+        $insuranceDataId = ServiceContainer::getInsuranceCoverage()->insertPolicy(
             [
                 $data['uuid'],
                 $data['type'],
@@ -425,8 +319,7 @@ class InsuranceService extends BaseService
         $data = $serviceSaveEvent->getSaveData();
 
         $dateEnd = $data['date_end'] ?? null;
-        $data['id'] = QueryUtils::sqlInsert(
-            "INSERT INTO `insurance_data` (`uuid`, `pid`, `type`, `provider`, `date`, `date_end`) VALUES (?, ?, ?, ?, ?, ?)",
+        $data['id'] = ServiceContainer::getInsuranceCoverage()->insertImportedPolicy(
             [$uuid, $data['pid'], $data['type'], $data['provider'], $data['date'], $dateEnd === '' ? null : $dateEnd]
         );
         $this->getEventDispatcher()->dispatch(new ServiceSaveEvent($this, $data), ServiceSaveEvent::EVENT_POST_SAVE);
@@ -537,11 +430,7 @@ class InsuranceService extends BaseService
      */
     public function getEffectiveInsurances(int $pid, DateTimeImmutable $day): array
     {
-        $rows = QueryUtils::fetchRecords(
-            "SELECT `id`, `uuid`, `type`, `provider`, `date`, `date_end` FROM `insurance_data` WHERE `pid` = ?",
-            [$pid]
-        );
-        return EffectiveInsuranceRule::choose($rows, $day);
+        return ServiceContainer::getInsuranceCoverage()->getEffectiveInsurances($pid, $day);
     }
 
     /**
@@ -556,43 +445,7 @@ class InsuranceService extends BaseService
      */
     public function getEffectiveInsuranceRows(int $pid, DateTimeImmutable $day): array
     {
-        $rows = QueryUtils::fetchRecords("SELECT * FROM `insurance_data` WHERE `pid` = ?", [$pid]);
-        $policies = EffectiveInsuranceRule::choose($rows, $day);
-        if ($policies === []) {
-            return [];
-        }
-        $rowsById = [];
-        foreach ($rows as $row) {
-            // A read with bound values returns the id as an int.
-            $id = $row['id'] ?? null;
-            if (is_int($id)) {
-                $rowsById[$id] = $row;
-            }
-        }
-        $companyIds = array_values(array_unique(array_map(
-            static fn(EffectiveInsurance $policy): int => $policy->companyId,
-            $policies
-        )));
-        $names = [];
-        $companies = QueryUtils::fetchRecords(
-            "SELECT `id`, `name` FROM `insurance_companies` WHERE `id` IN ("
-                . implode(',', array_fill(0, count($companyIds), '?')) . ")",
-            $companyIds
-        );
-        foreach ($companies as $company) {
-            $id = $company['id'] ?? null;
-            $name = $company['name'] ?? null;
-            if (is_int($id) && is_string($name)) {
-                $names[$id] = $name;
-            }
-        }
-        $result = [];
-        foreach ($policies as $policy) {
-            if (isset($rowsById[$policy->id])) {
-                $result[] = new EffectiveInsuranceRow($policy, $names[$policy->companyId] ?? null, $rowsById[$policy->id]);
-            }
-        }
-        return $result;
+        return ServiceContainer::getInsuranceCoverage()->getEffectiveInsuranceRows($pid, $day);
     }
 
     /**
@@ -608,22 +461,7 @@ class InsuranceService extends BaseService
      */
     public function getRuleRowsByPid(array $pids): array
     {
-        $rowsByPid = [];
-        foreach (array_chunk(array_values(array_unique($pids)), 1000) as $chunk) {
-            $rows = QueryUtils::fetchRecords(
-                "SELECT `id`, `uuid`, `pid`, `type`, `provider`, `date`, `date_end` FROM `insurance_data` WHERE `pid` IN ("
-                    . implode(',', array_fill(0, count($chunk), '?')) . ")",
-                $chunk
-            );
-            foreach ($rows as $row) {
-                // A read with bound values returns the pid as an int.
-                $rowPid = $row['pid'] ?? null;
-                if (is_int($rowPid)) {
-                    $rowsByPid[$rowPid][] = $row;
-                }
-            }
-        }
-        return $rowsByPid;
+        return ServiceContainer::getInsuranceCoverage()->getRuleRowsByPid($pids);
     }
 
     /**
@@ -635,7 +473,7 @@ class InsuranceService extends BaseService
      */
     public function getCoverageSegments(int $pid, InsuranceLevel $level, DateTimeImmutable $from, DateTimeImmutable $to): array
     {
-        return EffectiveInsuranceRule::segments($this->getRuleRowsByPid([$pid])[$pid] ?? [], $level, $from, $to);
+        return ServiceContainer::getInsuranceCoverage()->getCoverageSegments($pid, $level, $from, $to);
     }
 
     /**
@@ -644,12 +482,7 @@ class InsuranceService extends BaseService
      */
     public function getEffectiveInsuranceAt(int $pid, InsuranceLevel $level, DateTimeImmutable $day): ?EffectiveInsurance
     {
-        foreach ($this->getEffectiveInsurances($pid, $day) as $policy) {
-            if ($policy->level === $level) {
-                return $policy;
-            }
-        }
-        return null;
+        return ServiceContainer::getInsuranceCoverage()->getEffectiveInsuranceAt($pid, $level, $day);
     }
 
     public function swapInsurance($pid, string $targetType, string $insuranceUuid): ProcessingResult
@@ -665,7 +498,7 @@ class InsuranceService extends BaseService
         try {
             QueryUtils::startTransaction();
 
-            $targetUuid = QueryUtils::fetchSingleValue("SELECT uuid FROM insurance_data WHERE pid = ? AND type = ? ORDER BY (date IS NULL) ASC, date DESC", 'uuid', [$pid, $targetType]);
+            $targetUuid = ServiceContainer::getInsuranceCoverage()->latestUuidAtLevel($pid, $targetType);
             $targetInsurance = null;
             if (!empty($targetUuid)) {
                 $targetResult = $this->getOne(UuidRegistry::uuidToString($targetUuid));

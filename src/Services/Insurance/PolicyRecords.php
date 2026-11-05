@@ -1,23 +1,11 @@
 <?php
 
 /**
- * Policies on file: the stored insurance_data rows a caller asks about by
- * patient, by level, by id or uuid, or for many patients at once, as they are
- * on file (ended, current or not yet begun). Which policy is in force on a day
- * is InsuranceService::getEffectiveInsurances() and the reads beside it; this
- * class answers the other questions today's screens ask. The validator's
- * checks are PolicyChecks; SQL other queries embed is PolicySql.
- *
- * Each read is the query its callers ran before the boundary branch, moved
- * here unchanged (the same statement, the same binds and the same database
- * function), so it answers exactly as it did, ties and engine order included.
- * Where several callers asked the same question with the same query, they
- * share one method. A $columns argument is a SQL select list over the aliases
- * the method names (insd for the policy, ic for its company); callers pass
- * literals only, as the procedural functions always required.
- *
- * No permission checks: each caller keeps its own. Static, so a read runs none
- * of InsuranceService's setup (its constructor backfills missing uuids).
+ * PolicyRecords: the insurance module's PolicyRecords under the name the boundary branch gave it, so its callers are
+ * unchanged. Each method is one call through the Coverage contract
+ * (OpenEMR\BC\ServiceContainer::getInsuranceCoverage()). To be deprecated once core's callers ask
+ * the contract themselves (a @deprecated tag now would put every caller on PHPStan's deprecation
+ * rule). Generated from the module's class.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -30,17 +18,13 @@ declare(strict_types=1);
 
 namespace OpenEMR\Services\Insurance;
 
-use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\BC\ServiceContainer;
 
 final class PolicyRecords
 {
-    private const DEFAULT_COLUMNS = 'insd.*, ic.name as provider_name';
-
     private function __construct()
     {
     }
-
-    // ---- by patient and level ------------------------------------------------------------------
 
     /**
      * The latest-starting policy at a level, ended or not, with its company
@@ -48,12 +32,9 @@ final class PolicyRecords
      *
      * @return array<mixed>|false
      */
-    public static function latestAtLevel(mixed $pid, mixed $type, string $columns = self::DEFAULT_COLUMNS): array|false
+    public static function latestAtLevel(mixed $pid, mixed $type, string $columns = 'insd.*, ic.name as provider_name'): array|false
     {
-        $sql = "select $columns from insurance_data as insd " .
-            "left join insurance_companies as ic on ic.id = insd.provider " .
-            "where pid = ? and type = ? order by date DESC limit 1";
-        return QueryUtils::querySingleRow($sql, [$pid, $type]);
+        return ServiceContainer::getInsuranceCoverage()->latestAtLevel($pid, $type, $columns);
     }
 
     /**
@@ -64,8 +45,7 @@ final class PolicyRecords
      */
     public static function latestIdAtLevel(mixed $pid, mixed $type): array|false
     {
-        return QueryUtils::querySingleRow("SELECT id FROM insurance_data WHERE " .
-            "pid = ? AND type = ? ORDER BY date DESC LIMIT 1", [$pid, $type]);
+        return ServiceContainer::getInsuranceCoverage()->latestIdAtLevel($pid, $type);
     }
 
     /**
@@ -76,7 +56,7 @@ final class PolicyRecords
      */
     public static function latestSecondaryWithPayer(mixed $pid): array|false
     {
-        return QueryUtils::querySingleRow("SELECT i.*, ic.name, ic.id FROM insurance_data i join insurance_companies ic ON i.provider=ic.id WHERE i.pid=? and i.type='secondary' ORDER BY i.date DESC LIMIT 1", [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->latestSecondaryWithPayer($pid);
     }
 
     /**
@@ -85,12 +65,9 @@ final class PolicyRecords
      *
      * @return list<array<mixed>>
      */
-    public static function historyAtLevel(mixed $pid, mixed $type, string $columns = self::DEFAULT_COLUMNS): array
+    public static function historyAtLevel(mixed $pid, mixed $type, string $columns = 'insd.*, ic.name as provider_name'): array
     {
-        $sql = "select $columns from insurance_data as insd " .
-            "left join insurance_companies as ic on ic.id = insd.provider " .
-            "where pid = ? and type = ? order by date DESC";
-        return QueryUtils::fetchRecords($sql, [$pid, $type]);
+        return ServiceContainer::getInsuranceCoverage()->historyAtLevel($pid, $type, $columns);
     }
 
     /**
@@ -101,8 +78,7 @@ final class PolicyRecords
      */
     public static function historyOldestFirst(mixed $pid, mixed $type): array
     {
-        $sql = "select * from insurance_data where pid=? and type=? order by date ASC";
-        return QueryUtils::fetchRecords($sql, [$pid, $type]);
+        return ServiceContainer::getInsuranceCoverage()->historyOldestFirst($pid, $type);
     }
 
     /**
@@ -113,7 +89,7 @@ final class PolicyRecords
      */
     public static function historyWithPayerName(mixed $pid, mixed $type): array
     {
-        return QueryUtils::fetchRecords("select *, ic.name as provider_name from insurance_data left join insurance_companies as ic on ic.id = provider where pid=? and type=? order by date", [$pid, $type]);
+        return ServiceContainer::getInsuranceCoverage()->historyWithPayerName($pid, $type);
     }
 
     /**
@@ -126,12 +102,7 @@ final class PolicyRecords
      */
     public static function onDateAtLevel(mixed $pid, mixed $date, mixed $type, string $columns): array|false
     {
-        $sql = "select $columns from insurance_data as insd " .
-            "left join insurance_companies as ic on ic.id = provider " .
-            "where pid = ? and (date_format(date,'%Y-%m-%d') <= ? OR date IS NULL) and " .
-            "(date_format(date_end,'%Y-%m-%d') >= ? OR date_end IS NULL) and " .
-            "type = ? order by date DESC limit 1";
-        return QueryUtils::querySingleRow($sql, [$pid, $date, $date, $type]);
+        return ServiceContainer::getInsuranceCoverage()->onDateAtLevel($pid, $date, $type, $columns);
     }
 
     /**
@@ -143,9 +114,7 @@ final class PolicyRecords
      */
     public static function primaryCopayOn(mixed $pid, mixed $date): array|false
     {
-        return QueryUtils::querySingleRow("SELECT provider, copay FROM insurance_data " .
-            "WHERE pid = ? AND type = 'primary' " .
-            "AND (date <= ? OR date IS NULL) AND (date_end >= ? OR date_end IS NULL) ORDER BY date DESC LIMIT 1", [$pid, $date, $date]);
+        return ServiceContainer::getInsuranceCoverage()->primaryCopayOn($pid, $date);
     }
 
     /**
@@ -156,18 +125,8 @@ final class PolicyRecords
      */
     public static function levelAndPayerNameOn(mixed $pid, mixed $provider, mixed $date): array|false
     {
-        $query = "SELECT id.type, ic.name " .
-            "FROM insurance_data AS id, insurance_companies AS ic WHERE " .
-            "id.pid = ? AND " .
-            "id.provider = ? AND " .
-            "(id.date <= ? OR id.date IS NULL) AND " .
-            "(id.date_end >= ? OR id.date_end IS NULL) AND " .
-            "ic.id = id.provider " .
-            "ORDER BY id.type ASC, id.date DESC";
-        return QueryUtils::querySingleRow($query, [$pid, $provider, $date, $date]);
+        return ServiceContainer::getInsuranceCoverage()->levelAndPayerNameOn($pid, $provider, $date);
     }
-
-    // ---- by patient ------------------------------------------------------------------------------
 
     /**
      * Every policy, by level, latest start first (the old Copay screen keeps
@@ -177,8 +136,7 @@ final class PolicyRecords
      */
     public static function allByLevelLatestFirst(mixed $pid): array
     {
-        return QueryUtils::fetchRecords("SELECT * FROM insurance_data WHERE pid = ? " .
-            "ORDER BY type ASC, date DESC", [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->allByLevelLatestFirst($pid);
     }
 
     /**
@@ -190,16 +148,7 @@ final class PolicyRecords
      */
     public static function requisitionRows(mixed $pid): array
     {
-        $sql = "SELECT a.type, a.provider, a.plan_name, a.policy_number, a.group_number,
-           a.subscriber_lname, a.subscriber_fname, a.subscriber_relationship, a.subscriber_employer,
-		   b.name, c.line1, c.line2, c.city, c.state, c.zip
-           FROM `insurance_data` AS a
-           RIGHT JOIN insurance_companies AS b
-           ON a.provider = b.id
-           RIGHT JOIN addresses AS c
-           ON a.provider = c.foreign_id
-           WHERE a.pid = ? ";
-        return QueryUtils::fetchRecords($sql, [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->requisitionRows($pid);
     }
 
     /**
@@ -208,8 +157,7 @@ final class PolicyRecords
      */
     public static function firstSubscriberRelationship(mixed $pid): mixed
     {
-        $res = QueryUtils::querySingleRow("SELECT `subscriber_relationship` FROM `insurance_data` WHERE pid = ?", [$pid]);
-        return is_array($res) ? $res['subscriber_relationship'] : null;
+        return ServiceContainer::getInsuranceCoverage()->firstSubscriberRelationship($pid);
     }
 
     /**
@@ -220,8 +168,7 @@ final class PolicyRecords
      */
     public static function guarantorRowOn(mixed $pid, mixed $date): array
     {
-        return QueryUtils::fetchRecords("SELECT * FROM insurance_data WHERE " .
-            "pid = ? AND date <= ? ORDER BY type ASC, date DESC LIMIT 1", [$pid, $date]);
+        return ServiceContainer::getInsuranceCoverage()->guarantorRowOn($pid, $date);
     }
 
     /**
@@ -232,14 +179,7 @@ final class PolicyRecords
      */
     public static function countPrimaryWithSubscriber(mixed $pid): array|false
     {
-        return QueryUtils::querySingleRow(
-            "SELECT count(*) AS count FROM insurance_data WHERE " .
-            "pid = ? AND " .
-            "type='primary' AND " .
-            "subscriber_lname IS NOT NULL AND " .
-            "subscriber_lname != '' LIMIT 1",
-            [$pid]
-        );
+        return ServiceContainer::getInsuranceCoverage()->countPrimaryWithSubscriber($pid);
     }
 
     /**
@@ -248,8 +188,7 @@ final class PolicyRecords
      */
     public static function countLevelsWithPayer(mixed $pid): mixed
     {
-        return QueryUtils::fetchSingleValue("SELECT COUNT( DISTINCT TYPE ) NumberOfInsurance FROM `insurance_data`
-                                    where pid = ? and provider>0 ", 'NumberOfInsurance', [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->countLevelsWithPayer($pid);
     }
 
     /**
@@ -260,10 +199,7 @@ final class PolicyRecords
      */
     public static function levelsAndPayerNames(mixed $pid): array
     {
-        return QueryUtils::fetchRecords("SELECT insurance_data.type as type, insurance_companies.name as name " .
-            "FROM insurance_data " .
-            "INNER JOIN insurance_companies ON insurance_data.provider = insurance_companies.id " .
-            "WHERE insurance_data.pid = ?", [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->levelsAndPayerNames($pid);
     }
 
     /**
@@ -274,7 +210,7 @@ final class PolicyRecords
      */
     public static function primaryIdAndCopay(mixed $pid): array|false
     {
-        return QueryUtils::querySingleRow("SELECT id, copay FROM insurance_data WHERE type = 'primary' and pid = ?", [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->primaryIdAndCopay($pid);
     }
 
     /**
@@ -285,17 +221,7 @@ final class PolicyRecords
      */
     public static function eligibilityResults(mixed $pid): array
     {
-        $query =
-            "SELECT eligr.*, eligv.insurance_id, eligv.copay, insd.pid, insc.name, " .
-            "Date_Format(eligv.eligibility_check_date, '%W %M %e, %Y %h:%i %p') AS verificationDate " .
-            "FROM eligibility_verification eligv " .
-            "INNER JOIN benefit_eligibility eligr ON eligr.verification_id = eligv.verification_id " .
-            "INNER JOIN insurance_data insd ON insd.id = eligv.insurance_id " .
-            "INNER JOIN insurance_companies insc ON insc.id = insd.provider " .
-            "WHERE insd.pid = ? AND eligv.eligibility_check_date = " .
-            "(SELECT Max(eligibility_verification.eligibility_check_date) FROM eligibility_verification " .
-            "WHERE eligibility_verification.insurance_id = eligv.insurance_id)";
-        return QueryUtils::fetchRecords($query, [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->eligibilityResults($pid);
     }
 
     /**
@@ -305,22 +231,7 @@ final class PolicyRecords
      */
     public static function selfPlanNamesStatement(mixed $pid): \ADORecordSet
     {
-        return QueryUtils::sqlStatementThrowException(
-            'SELECT `ins`.`name`
-			FROM (
-				SELECT
-					`id`.`type`,
-					`ic`.`name`
-				FROM `insurance_data` AS `id`
-					LEFT JOIN `insurance_companies` AS `ic` ON `ic`.`id` = `id`.`provider`
-				WHERE `id`.`pid` = ?
-					AND `id`.`subscriber_relationship` = \'self\'
-					AND `id`.`provider` > 0
-				ORDER BY `id`.`date` DESC
-			) AS `ins`
-			GROUP BY `ins`.`type`;',
-            [$pid]
-        );
+        return ServiceContainer::getInsuranceCoverage()->selfPlanNamesStatement($pid);
     }
 
     /**
@@ -331,22 +242,7 @@ final class PolicyRecords
      */
     public static function primarySubscriberAsResponsibleParty(mixed $pid): array|false
     {
-        $insurance = <<<SQL
-        select subscriber_lname AS ResponsiblePartyLastName,
-               subscriber_fname AS ResponsiblePartyFirstName,
-               subscriber_street AS ResponsiblePartyAddressLine1,
-               subscriber_postal_code AS ResponsiblePartyPostalCode,
-               subscriber_city AS ResponsiblePartyCity,
-               subscriber_state AS ResponsiblePartyState,
-               subscriber_phone AS ResponsiblePartyPrimaryPhone,
-               subscriber_street_line_2 AS ResponsiblePartyAddressLine2
-          FROM insurance_data
-         WHERE pid = ?
-           AND subscriber_relationship > ''
-           AND subscriber_relationship != 'self'
-           AND type = 'primary'
-        SQL;
-        return QueryUtils::querySingleRow($insurance, [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->primarySubscriberAsResponsibleParty($pid);
     }
 
     /**
@@ -356,7 +252,7 @@ final class PolicyRecords
      */
     public static function primaryRelationshipRow(mixed $pid): array|false
     {
-        return QueryUtils::querySingleRow("select subscriber_relationship from insurance_data where pid = ? and type = 'primary'", [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->primaryRelationshipRow($pid);
     }
 
     /**
@@ -367,12 +263,8 @@ final class PolicyRecords
      */
     public static function primaryPayerNameRow(mixed $pid): array|false
     {
-        return QueryUtils::querySingleRow("SELECT ic.name FROM `insurance_data` id
-            JOIN insurance_companies ic ON id.provider = ic.id
-            WHERE `pid` = ? AND type = 'primary'", [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->primaryPayerNameRow($pid);
     }
-
-    // ---- by id and uuid --------------------------------------------------------------------------
 
     /**
      * A policy by id, at a level and for a patient, whose company exists: every
@@ -383,11 +275,7 @@ final class PolicyRecords
      */
     public static function withPayerById(mixed $type, mixed $pid, mixed $id): array|false
     {
-        return QueryUtils::querySingleRow(
-            "SELECT i.*, c.name AS company_name, c.uuid as compuuid FROM insurance_data i " .
-            "JOIN insurance_companies c ON i.provider = c.id WHERE i.type = ? AND i.pid = ? AND i.id = ?",
-            [$type, $pid, $id]
-        );
+        return ServiceContainer::getInsuranceCoverage()->withPayerById($type, $pid, $id);
     }
 
     /**
@@ -398,7 +286,7 @@ final class PolicyRecords
      */
     public static function columnsById(mixed $id, string $columns): array|false
     {
-        return QueryUtils::querySingleRow("SELECT $columns FROM insurance_data AS insd WHERE insd.id = ?", [$id]);
+        return ServiceContainer::getInsuranceCoverage()->columnsById($id, $columns);
     }
 
     /**
@@ -410,25 +298,7 @@ final class PolicyRecords
      */
     public static function withPayerForBillingExport(mixed $pid, mixed $providerId): array
     {
-        $query = "SELECT " .
-          "d.type, d.policy_number, d.group_number, " .
-          "d.subscriber_lname, d.subscriber_fname, d.subscriber_mname, " .
-          "d.subscriber_street, d.subscriber_city, d.subscriber_state, " .
-          "d.subscriber_postal_code, d.subscriber_DOB, d.subscriber_sex, " .
-          "d.subscriber_relationship, " .
-          "c.name, " .
-          "a.line1, a.line2, a.city, a.state, a.zip, " .
-          "p.area_code, p.prefix, p.number, " .
-          "n.provider_number " .
-          "FROM insurance_data AS d " .
-          "LEFT OUTER JOIN insurance_companies AS c ON c.id = d.provider " .
-          "LEFT OUTER JOIN addresses AS a ON a.foreign_id = c.id " .
-          "LEFT OUTER JOIN phone_numbers AS p ON p.foreign_id = c.id AND p.type = 2 " .
-          "LEFT OUTER JOIN insurance_numbers AS n ON n.provider_id = ? " .
-          "AND n.insurance_company_id = c.id " .
-          "WHERE d.pid = ? AND d.provider != '' " .
-          "ORDER BY d.type ASC, d.date DESC";
-        return QueryUtils::fetchRecords($query, [$providerId, $pid]);
+        return ServiceContainer::getInsuranceCoverage()->withPayerForBillingExport($pid, $providerId);
     }
 
     /**
@@ -438,10 +308,8 @@ final class PolicyRecords
      */
     public static function byUuid(string $uuidBytes): array|false
     {
-        return QueryUtils::querySingleRow("SELECT * FROM insurance_data WHERE uuid = ?", [$uuidBytes]);
+        return ServiceContainer::getInsuranceCoverage()->byUuid($uuidBytes);
     }
-
-    // ---- many patients ---------------------------------------------------------------------------
 
     /**
      * Many patients' policies at a level, each with its company joined as ic,
@@ -452,18 +320,7 @@ final class PolicyRecords
      */
     public static function forPatientsAtLevel(array $pids, mixed $type, string $columns = 'insd.*, ic.name AS company_name'): array
     {
-        $pids = array_values(array_unique(array_filter($pids, fn($pid): bool => is_int($pid) || (is_string($pid) && $pid !== ''))));
-        $rows = [];
-        foreach (array_chunk($pids, 1000) as $chunk) {
-            $sql = "SELECT $columns FROM insurance_data AS insd " .
-                "LEFT JOIN insurance_companies AS ic ON ic.id = insd.provider " .
-                "WHERE insd.type = ? AND insd.pid IN (" . implode(',', array_fill(0, count($chunk), '?')) . ") " .
-                "ORDER BY insd.pid, insd.date, insd.id";
-            foreach (QueryUtils::fetchRecords($sql, [$type, ...$chunk]) as $row) {
-                $rows[] = $row;
-            }
-        }
-        return $rows;
+        return ServiceContainer::getInsuranceCoverage()->forPatientsAtLevel($pids, $type, $columns);
     }
 
     /**
@@ -474,7 +331,7 @@ final class PolicyRecords
      */
     public static function patientsWithPayerLike(string $provider): array
     {
-        return QueryUtils::fetchTableColumn("SELECT `pid`  FROM `insurance_data` WHERE `provider` LIKE ? ORDER BY `id` ASC", 'pid', [$provider]);
+        return ServiceContainer::getInsuranceCoverage()->patientsWithPayerLike($provider);
     }
 
     /**
@@ -487,10 +344,7 @@ final class PolicyRecords
      */
     public static function primaryPayerTypes(array $pids): array
     {
-        $insQry = "SELECT insd.*, ic.ins_type_code FROM (SELECT pid, provider FROM insurance_data WHERE type = 'primary' ORDER BY id DESC) insd " .
-            "INNER JOIN  insurance_companies ic ON insd.provider = ic.id " .
-            "WHERE insd.pid IN (" . add_escape_custom(implode(",", array_map(fn($pid): string => is_scalar($pid) ? (string)$pid : '', $pids))) . ")";
-        return QueryUtils::fetchRecords($insQry);
+        return ServiceContainer::getInsuranceCoverage()->primaryPayerTypes($pids);
     }
 
     /**
@@ -501,10 +355,6 @@ final class PolicyRecords
      */
     public static function primaryPayerTypesForPatient(mixed $pid): array
     {
-        $insQry = "SELECT insd.*, ic.ins_type_code FROM (SELECT pid, provider FROM insurance_data WHERE type = 'primary' ORDER BY id DESC) insd " .
-            "INNER JOIN  insurance_companies ic ON insd.provider = ic.id " .
-            "WHERE insd.pid = ?";
-        return QueryUtils::fetchRecords($insQry, [$pid]);
+        return ServiceContainer::getInsuranceCoverage()->primaryPayerTypesForPatient($pid);
     }
-
 }

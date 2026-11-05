@@ -12,10 +12,15 @@
 
 declare(strict_types=1);
 
-namespace OpenEMR\Services\Insurance;
+namespace OpenEMR\Modules\Insurance\Policies;
 
 use DateTimeImmutable;
 use OpenEMR\Common\Uuid\UuidRegistry;
+use OpenEMR\Services\Insurance\{
+    CoverageSegment,
+    EffectiveInsurance,
+    InsuranceLevel,
+};
 
 /**
  * The rule:
