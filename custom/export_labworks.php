@@ -87,39 +87,61 @@ function mydie($msg): void
  $insrow = [];
  global $pid; // defined in globals.php
 foreach (['primary','secondary'] as $value) {
-    $insrow[] = sqlQuery("SELECT id FROM insurance_data WHERE " .
-    "pid = ? AND type = ? ORDER BY date DESC LIMIT 1", [$pid, $value]);
+    $insrow[] = \OpenEMR\Services\Insurance\PolicyRecords::latestIdAtLevel($pid, $value);
 }
 
- $query = "SELECT " .
+// The policies' columns (the coverage service), each company's name and type (the payer door) and the
+// company's first address, as the one query that joined them took its first row.
+/**
+ * @param array<string, string> $policyColumns column => the alias's stem (the policy's number $n follows)
+ * @param array<string, string> $addressColumns column => alias
+ * @return array<mixed>
+ */
+$exportPolicy = static function (mixed $policyId, int $n, array $policyColumns, array $addressColumns): array {
+    $select = [];
+    $none = [];
+    foreach ($policyColumns as $column => $alias) {
+        if (!is_string($column) || !is_string($alias)) {
+            continue; // literals only, below
+        }
+        $select[] = "insd.$column AS $alias$n";
+        $none["$alias$n"] = null;
+    }
+    $policy = \OpenEMR\Services\Insurance\PolicyRecords::columnsById($policyId, implode(', ', $select));
+    $out = is_array($policy) ? $policy : $none;
+    $company = is_array($policy) ? \OpenEMR\Services\InsuranceCompanyService::columnsOf($policy["provider$n"], "id, name AS name$n, ins_type_code AS instype$n") : false;
+    $companyId = is_array($company) ? $company['id'] : null;
+    if (is_array($company)) {
+        unset($company['id']);
+    }
+    $out += is_array($company) ? $company : ["name$n" => null, "instype$n" => null];
+    $select = [];
+    $none = [];
+    foreach ($addressColumns as $column => $alias) {
+        if (!is_string($column) || !is_string($alias)) {
+            continue; // literals only, below
+        }
+        $select[] = "$column AS $alias";
+        $none[$alias] = null;
+    }
+    $address = $companyId === null ? false : \OpenEMR\Common\Database\QueryUtils::querySingleRow("SELECT " . implode(', ', $select) . " FROM addresses WHERE foreign_id = ? LIMIT 1", [$companyId]);
+    return $out + (is_array($address) ? $address : $none);
+};
+$row = sqlFetchArray(sqlStatement("SELECT " .
   "p.pubpid, p.fname, p.mname, p.lname, p.DOB, p.providerID, " .
-  "p.ss, p.street, p.city, p.state, p.postal_code, p.phone_home, p.sex, " .
-  "i1.policy_number AS policy1, i1.group_number AS group1, i1.provider as provider1, " .
-  "i1.subscriber_fname AS fname1, i1.subscriber_mname AS mname1, i1.subscriber_lname AS lname1, " .
-  "i1.subscriber_street AS sstreet1, i1.subscriber_city AS scity1, i1.subscriber_state AS sstate1, " .
-  "i1.subscriber_postal_code AS szip1, i1.subscriber_relationship AS relationship1, " .
-  "c1.name AS name1, c1.ins_type_code AS instype1, " .
-  "a1.line1 AS street11, a1.line2 AS street21, a1.city AS city1, a1.state AS state1, " .
-  "a1.zip AS zip1, a1.plus_four AS zip41, " .
-  "i2.policy_number AS policy2, i2.group_number AS group2, i2.provider as provider2, " .
-  "i2.subscriber_fname AS fname2, i2.subscriber_mname AS mname2, i2.subscriber_lname AS lname2, " .
-  "i2.subscriber_relationship AS relationship2, " .
-  "c2.name AS name2, c2.ins_type_code AS instype2, " .
-  "a2.line1 AS street12, a2.line2 AS street22, a2.city AS city2, a2.state AS state2, " .
-  "a2.zip AS zip2, a2.plus_four AS zip42 " .
-  "FROM patient_data AS p " .
-  // "LEFT OUTER JOIN insurance_data AS i1 ON i1.pid = p.pid AND i1.type = 'primary' " .
-  // "LEFT OUTER JOIN insurance_data AS i2 ON i2.pid = p.pid AND i2.type = 'secondary' " .
-  "LEFT OUTER JOIN insurance_data AS i1 ON i1.id = ? " .
-  "LEFT OUTER JOIN insurance_data AS i2 ON i2.id = ? " .
-  //
-  "LEFT OUTER JOIN insurance_companies AS c1 ON c1.id = i1.provider " .
-  "LEFT OUTER JOIN insurance_companies AS c2 ON c2.id = i2.provider " .
-  "LEFT OUTER JOIN addresses AS a1 ON a1.foreign_id = c1.id " .
-  "LEFT OUTER JOIN addresses AS a2 ON a2.foreign_id = c2.id " .
-  "WHERE p.pid = ? LIMIT 1";
-
- $row = sqlFetchArray(sqlStatement($query, [$insrow[0]['id'], $insrow[1]['id'], $pid]));
+  "p.ss, p.street, p.city, p.state, p.postal_code, p.phone_home, p.sex " .
+  "FROM patient_data AS p WHERE p.pid = ? LIMIT 1", [$pid]));
+if (is_array($row)) {
+    $row += $exportPolicy(is_array($insrow[0]) ? $insrow[0]['id'] : null, 1, ['policy_number' => 'policy', 'group_number' => 'group', 'provider' => 'provider',
+        'subscriber_fname' => 'fname', 'subscriber_mname' => 'mname', 'subscriber_lname' => 'lname',
+        'subscriber_street' => 'sstreet', 'subscriber_city' => 'scity', 'subscriber_state' => 'sstate',
+        'subscriber_postal_code' => 'szip', 'subscriber_relationship' => 'relationship'],
+        ['line1' => 'street11', 'line2' => 'street21', 'city' => 'city1', 'state' => 'state1', 'zip' => 'zip1', 'plus_four' => 'zip41']);
+    $row += $exportPolicy(is_array($insrow[1]) ? $insrow[1]['id'] : null, 2, ['policy_number' => 'policy', 'group_number' => 'group', 'provider' => 'provider',
+        'subscriber_fname' => 'fname', 'subscriber_mname' => 'mname', 'subscriber_lname' => 'lname',
+        'subscriber_relationship' => 'relationship'],
+        ['line1' => 'street12', 'line2' => 'street22', 'city' => 'city2', 'state' => 'state2', 'zip' => 'zip2', 'plus_four' => 'zip42']);
+}
 
  // Get primary care doc info.  If none was selected in the patient
  // demographics then pick the #1 doctor in the clinic.

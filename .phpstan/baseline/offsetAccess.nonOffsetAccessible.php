@@ -1013,7 +1013,7 @@ $ignoreErrors[] = [
 ];
 $ignoreErrors[] = [
     'message' => '#^Cannot access offset \'id\' on array\\|false\\.$#',
-    'count' => 3,
+    'count' => 1,
     'path' => __DIR__ . '/../../custom/export_labworks.php',
 ];
 $ignoreErrors[] = [

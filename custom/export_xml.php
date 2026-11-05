@@ -87,66 +87,66 @@ function addInsurance($row, $seq): void
  //~Well, now it does...-Art
  $insrow = [];
 foreach (['primary','secondary','tertiary'] as $value) {
-    $insrow[] = sqlQuery("SELECT id FROM insurance_data WHERE " .
-    "pid = ? AND type = ? ORDER BY date DESC LIMIT 1", [$pid, $value]);
+    $insrow[] = \OpenEMR\Services\Insurance\PolicyRecords::latestIdAtLevel($pid, $value);
 }
 
- $query = "SELECT " .
-  "p.*, " .
-  "i1.policy_number AS policy1, i1.group_number AS group1, i1.provider as provider1, " .
-  "i1.subscriber_fname AS fname1, i1.subscriber_mname AS mname1, i1.subscriber_lname AS lname1, " .
-  "i1.subscriber_street AS sstreet1, i1.subscriber_city AS scity1, i1.subscriber_state AS sstate1, " .
-  "i1.subscriber_postal_code AS szip1, i1.subscriber_relationship AS relationship1, " .
-  "i1.subscriber_DOB AS sdob1, i1.subscriber_ss AS sss1, i1.subscriber_phone AS sphone1, " .
-  "i1.subscriber_sex AS ssex1, i1.subscriber_country AS scountry1, " .
-  "i1.subscriber_employer AS semployer1, i1.subscriber_employer_street AS semployer_street1, " .
-  "i1.subscriber_employer_city AS semployer_city1, i1.subscriber_employer_state AS semployer_state1, " .
-  "i1.subscriber_employer_postal_code AS semployer_zip1, " .
-  "i1.subscriber_employer_country AS semployer_country1, i1.copay AS copay1, " .
-  "c1.name AS name1, c1.ins_type_code AS instype1, " .
-  "a1.line1 AS street11, a1.line2 AS street21, a1.city AS city1, a1.state AS state1, " .
-  "a1.zip AS zip1, a1.plus_four AS zip41, a1.country AS country1, " .
-  "i2.policy_number AS policy2, i2.group_number AS group2, i2.provider as provider2, " .
-  "i2.subscriber_fname AS fname2, i2.subscriber_mname AS mname2, i2.subscriber_lname AS lname2, " .
-  "i2.subscriber_postal_code AS szip2, i2.subscriber_relationship AS relationship2, " .
-  "i2.subscriber_DOB AS sdob2, i2.subscriber_ss AS sss2, i2.subscriber_phone AS sphone2, " .
-  "i2.subscriber_sex AS ssex2, i2.subscriber_country AS scountry2, " .
-  "i2.subscriber_employer AS semployer2, i2.subscriber_employer_street AS semployer_street2, " .
-  "i2.subscriber_employer_city AS semployer_city2, i2.subscriber_employer_state AS semployer_state2, " .
-  "i2.subscriber_employer_postal_code AS semployer_zip2, " .
-  "i2.subscriber_employer_country AS semployer_country2, i2.copay AS copay2, " .
-  "c2.name AS name2, c2.ins_type_code AS instype2, " .
-  "a2.line1 AS street12, a2.line2 AS street22, a2.city AS city2, a2.state AS state2, " .
-  "a2.zip AS zip2, a2.plus_four AS zip42, a2.country AS country2, " .
-  "i3.policy_number AS policy3, i3.group_number AS group3, i3.provider as provider3, " .
-  "i3.subscriber_fname AS fname3, i3.subscriber_mname AS mname3, i3.subscriber_lname AS lname3, " .
-  "i3.subscriber_postal_code AS szip3, i3.subscriber_relationship AS relationship3, " .
-  "i3.subscriber_DOB AS sdob3, i3.subscriber_ss AS sss3, i3.subscriber_phone AS sphone3, " .
-  "i3.subscriber_sex AS ssex3, i3.subscriber_country AS scountry3, " .
-  "i3.subscriber_employer AS semployer3, i3.subscriber_employer_street AS semployer_street3, " .
-  "i3.subscriber_employer_city AS semployer_city3, i3.subscriber_employer_state AS semployer_state3, " .
-  "i3.subscriber_employer_postal_code AS semployer_zip3, " .
-  "i3.subscriber_employer_country AS semployer_country3, i3.copay AS copay3, " .
-  "c3.name AS name3, c3.ins_type_code AS instype3, " .
-  "a3.line1 AS street13, a3.line2 AS street23, a3.city AS city3, a3.state AS state3, " .
-  "a3.zip AS zip3, a3.plus_four AS zip43, a3.country AS country3 " .
-  "FROM patient_data AS p " .
-  // "LEFT OUTER JOIN insurance_data AS i1 ON i1.pid = p.pid AND i1.type = 'primary'   " .
-  // "LEFT OUTER JOIN insurance_data AS i2 ON i2.pid = p.pid AND i2.type = 'secondary' " .
-  // "LEFT OUTER JOIN insurance_data AS i3 ON i3.pid = p.pid AND i3.type = 'tertiary'  " .
-  "LEFT OUTER JOIN insurance_data AS i1 ON i1.id = ? " .
-  "LEFT OUTER JOIN insurance_data AS i2 ON i2.id = ? " .
-  "LEFT OUTER JOIN insurance_data AS i3 ON i3.id = ? " .
-  //
-  "LEFT OUTER JOIN insurance_companies AS c1 ON c1.id = i1.provider " .
-  "LEFT OUTER JOIN insurance_companies AS c2 ON c2.id = i2.provider " .
-  "LEFT OUTER JOIN insurance_companies AS c3 ON c3.id = i3.provider " .
-  "LEFT OUTER JOIN addresses AS a1 ON a1.foreign_id = c1.id " .
-  "LEFT OUTER JOIN addresses AS a2 ON a2.foreign_id = c2.id " .
-  "LEFT OUTER JOIN addresses AS a3 ON a3.foreign_id = c3.id " .
-  "WHERE p.pid = ? LIMIT 1";
-
- $row = sqlFetchArray(sqlStatement($query, [($insrow[0]['id'] ?? null), ($insrow[1]['id'] ?? null), ($insrow[2]['id'] ?? null), $pid]));
+// The policies' columns (the coverage service), each company's name and type (the payer door) and the
+// company's first address, as the one query that joined them took its first row.
+/**
+ * @param array<string, string> $policyColumns column => the alias's stem (the policy's number $n follows)
+ * @param array<string, string> $addressColumns column => alias
+ * @return array<mixed>
+ */
+$exportPolicy = static function (mixed $policyId, int $n, array $policyColumns, array $addressColumns): array {
+    $select = [];
+    $none = [];
+    foreach ($policyColumns as $column => $alias) {
+        if (!is_string($column) || !is_string($alias)) {
+            continue; // literals only, below
+        }
+        $select[] = "insd.$column AS $alias$n";
+        $none["$alias$n"] = null;
+    }
+    $policy = \OpenEMR\Services\Insurance\PolicyRecords::columnsById($policyId, implode(', ', $select));
+    $out = is_array($policy) ? $policy : $none;
+    $company = is_array($policy) ? \OpenEMR\Services\InsuranceCompanyService::columnsOf($policy["provider$n"], "id, name AS name$n, ins_type_code AS instype$n") : false;
+    $companyId = is_array($company) ? $company['id'] : null;
+    if (is_array($company)) {
+        unset($company['id']);
+    }
+    $out += is_array($company) ? $company : ["name$n" => null, "instype$n" => null];
+    $select = [];
+    $none = [];
+    foreach ($addressColumns as $column => $alias) {
+        if (!is_string($column) || !is_string($alias)) {
+            continue; // literals only, below
+        }
+        $select[] = "$column AS $alias";
+        $none[$alias] = null;
+    }
+    $address = $companyId === null ? false : \OpenEMR\Common\Database\QueryUtils::querySingleRow("SELECT " . implode(', ', $select) . " FROM addresses WHERE foreign_id = ? LIMIT 1", [$companyId]);
+    return $out + (is_array($address) ? $address : $none);
+};
+$xmlPolicy = ['policy_number' => 'policy', 'group_number' => 'group', 'provider' => 'provider',
+    'subscriber_fname' => 'fname', 'subscriber_mname' => 'mname', 'subscriber_lname' => 'lname',
+    'subscriber_street' => 'sstreet', 'subscriber_city' => 'scity', 'subscriber_state' => 'sstate',
+    'subscriber_postal_code' => 'szip', 'subscriber_relationship' => 'relationship',
+    'subscriber_DOB' => 'sdob', 'subscriber_ss' => 'sss', 'subscriber_phone' => 'sphone',
+    'subscriber_sex' => 'ssex', 'subscriber_country' => 'scountry',
+    'subscriber_employer' => 'semployer', 'subscriber_employer_street' => 'semployer_street',
+    'subscriber_employer_city' => 'semployer_city', 'subscriber_employer_state' => 'semployer_state',
+    'subscriber_employer_postal_code' => 'semployer_zip', 'subscriber_employer_country' => 'semployer_country',
+    'copay' => 'copay'];
+// The secondary and tertiary leave out the subscriber's street, city and state, as the query did.
+$xmlPolicyOther = array_diff_key($xmlPolicy, array_flip(['subscriber_street', 'subscriber_city', 'subscriber_state']));
+$row = sqlFetchArray(sqlStatement("SELECT p.* FROM patient_data AS p WHERE p.pid = ? LIMIT 1", [$pid]));
+if (is_array($row)) {
+    foreach ([1, 2, 3] as $n) {
+        $row += $exportPolicy($insrow[$n - 1]['id'] ?? null, $n, $n === 1 ? $xmlPolicy : $xmlPolicyOther, [
+            'line1' => "street1$n", 'line2' => "street2$n", 'city' => "city$n", 'state' => "state$n",
+            'zip' => "zip$n", 'plus_four' => "zip4$n", 'country' => "country$n"]);
+    }
+}
 
  $rowed = getEmployerData($pid);
 

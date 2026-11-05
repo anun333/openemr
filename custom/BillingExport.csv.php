@@ -197,28 +197,8 @@ class BillingExport
 
         // Insurance information, up to 3 lines:
 
-        $query = "SELECT " .
-          "d.type, d.policy_number, d.group_number, " .
-          "d.subscriber_lname, d.subscriber_fname, d.subscriber_mname, " .
-          "d.subscriber_street, d.subscriber_city, d.subscriber_state, " .
-          "d.subscriber_postal_code, d.subscriber_DOB, d.subscriber_sex, " .
-          "d.subscriber_relationship, " .
-          "c.name, " .
-          "a.line1, a.line2, a.city, a.state, a.zip, " .
-          "p.area_code, p.prefix, p.number, " .
-          "n.provider_number " .
-          "FROM insurance_data AS d " .
-          "LEFT OUTER JOIN insurance_companies AS c ON c.id = d.provider " .
-          "LEFT OUTER JOIN addresses AS a ON a.foreign_id = c.id " .
-          "LEFT OUTER JOIN phone_numbers AS p ON p.foreign_id = c.id AND p.type = 2 " .
-          "LEFT OUTER JOIN insurance_numbers AS n ON n.provider_id = ? " .
-          "AND n.insurance_company_id = c.id " .
-          "WHERE d.pid = ? AND d.provider != '' " .
-          "ORDER BY d.type ASC, d.date DESC";
-        $ires = sqlStatement($query, [$erow['id'], $patient_id]);
-
         $prev_type = '?';
-        while ($irow = sqlFetchArray($ires)) {
+        foreach (\OpenEMR\Services\Insurance\PolicyRecords::withPayerForBillingExport($patient_id, $erow['id']) as $irow) {
             if (strcmp((string) $irow['type'], (string) $prev_type) == 0) {
                 continue;
             }
