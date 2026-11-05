@@ -25,8 +25,13 @@
 
 require_once("verify_session.php");
 
-$sql = "SELECT * FROM prescriptions WHERE `patient_id` = ? AND `end_date` IS NULL ORDER BY `start_date`";
-$res = sqlStatement($sql, [$pid]);
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
+
+// The prescriptions in force today: active ("currently active" ticked), and not past their end date, so a course
+// with an end date ahead is listed and a discontinued one isn't.
+$sql = "SELECT * FROM prescriptions WHERE `patient_id` = ? AND " . InForce::prescriptionSql() . " ORDER BY `start_date`";
+$res = sqlStatement($sql, [$pid, ...InForce::prescriptionBinds((new SiteClock())->today())]);
 
 if (sqlNumRows($res) > 0) {
     ?>
