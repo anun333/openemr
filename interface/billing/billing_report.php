@@ -1155,8 +1155,12 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                                         $insuranceName = sqlQuery("SELECT `name` FROM `insurance_companies` WHERE `id` = ?", [$row['provider']])['name'];
                                         $x12Partner = sqlQuery("SELECT `x12_default_partner_id` FROM `insurance_companies` WHERE `id` = ?", [$row['provider']])['x12_default_partner_id'];
                                         $lhtml .= "<option value=\"" . attr(substr((string) $row['type'], 0, 1) . $row['provider']) . "\"";
+                                        // Twin (insurance-reference): preselect the level after the last one closed, by
+                                        // level. Master compared the list position with the level closed, which held only
+                                        // while getEffectiveInsurances() stopped at the first level with nothing in force.
+                                        $rowLevel = ['primary' => 1, 'secondary' => 2, 'tertiary' => 3][$row['type']] ?? 0;
                                         if (
-                                            $key == $last_level_closed
+                                            $rowLevel == $last_level_closed + 1
                                             || $insuranceCount == 1
                                         ) {
                                             $lhtml .= " selected";
