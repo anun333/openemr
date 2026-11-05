@@ -20,6 +20,8 @@ use Document;
 use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Command\Trait\CommandLineDebugStylerTrait;
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\PartialDate;
+use OpenEMR\Common\Dates\Precision;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Services\CodeTypesService;
 use OpenEMR\Services\InsuranceCompanyService;
@@ -63,6 +65,13 @@ class CdaTemplateImportDispose
         $test = explode('-', (string) $time);
         if (count($test ?? []) === 2) {
             $time = $test[0];
+        }
+
+        // A year (2015) or a year and month (201505) is a partial date: its first day, never today
+        // (strtotime() reads four or six digits as a time of day).
+        $partial = is_string($time) ? PartialDate::fromHl7($time) : null;
+        if ($partial !== null && in_array($partial->precision, [Precision::Year, Precision::Month], true)) {
+            return $partial->firstInstant()->getTimestamp();
         }
 
         return strtotime((string) $time);
