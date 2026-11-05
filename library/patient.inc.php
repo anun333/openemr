@@ -1479,22 +1479,14 @@ function dateToDB($date): string
  */
 function getEffectiveInsurances($patient_id, $encdate): array
 {
-    $insarr = [];
-    foreach (['primary','secondary','tertiary'] as $instype) {
-        $tmp = sqlQuery(
-            "SELECT * FROM insurance_data " .
-            "WHERE pid = ? AND type = ? " .
-            "AND (date <= ? OR date IS NULL) AND (date_end >= ? OR date_end IS NULL) ORDER BY date DESC LIMIT 1",
-            [$patient_id, $instype, $encdate, $encdate]
-        );
-        if (empty($tmp['provider'])) {
-            break;
-        }
-
-        $insarr[] = $tmp;
-    }
-
-    return $insarr;
+    // Twin (insurance-reference): a wrapper over the coverage service, as
+    // getEmployerData() is over EmployerService. Two changes for its callers
+    // (the Billing Manager's payer drop-down, get_patient_balance(), the
+    // patient ledger, the universal, Quest and default lab generators): a
+    // current secondary behind an ended primary is returned (no stop at an
+    // empty level), and a datetime passed as $encdate counts as its day.
+    $day = \OpenEMR\Services\Insurance\CoverageDay::forVisit($encdate, \OpenEMR\Services\Insurance\CoverageDay::today());
+    return (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows((int)$patient_id, $day);
 }
 
 /**
