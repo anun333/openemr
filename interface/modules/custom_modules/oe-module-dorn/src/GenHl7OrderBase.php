@@ -13,6 +13,7 @@
 namespace OpenEMR\Modules\Dorn;
 
 use InsuranceCompany;
+use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Services\Insurance\CoverageDay;
 use OpenEMR\Services\InsuranceService;
 
@@ -230,9 +231,10 @@ class GenHl7OrderBase
     {
         // Twin (insurance-reference): the coverage service's policies in force
         // on the day; master ignored the end date.
-        $day = CoverageDay::forVisit($date, CoverageDay::today());
+        $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
         $payers = [];
-        foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $drow) {
+        foreach ((new InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $day) as $effective) {
+            $drow = $effective->columns;
             $ins = count($payers);
             $crow = sqlQuery("SELECT * FROM insurance_companies WHERE id = ?", [$drow['provider']]);
             $orow = new InsuranceCompany($drow['provider']);
@@ -248,10 +250,10 @@ class GenHl7OrderBase
     public function loadGuarantorInfo($pid, $date = ''): array
     {
         // Twin (insurance-reference): the first policy in force on the day.
-        $day = CoverageDay::forVisit($date, CoverageDay::today());
+        $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
         $guarantors = [];
-        foreach (array_slice((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day), 0, 1) as $drow) {
-            $guarantors[] = ['data' => $drow];
+        foreach (array_slice((new InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $day), 0, 1) as $effective) {
+            $guarantors[] = ['data' => $effective->columns];
         }
         return $guarantors;
     }

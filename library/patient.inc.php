@@ -1485,8 +1485,12 @@ function getEffectiveInsurances($patient_id, $encdate): array
     // patient ledger, the universal, Quest and default lab generators): a
     // current secondary behind an ended primary is returned (no stop at an
     // empty level), and a datetime passed as $encdate counts as its day.
-    $day = \OpenEMR\Services\Insurance\CoverageDay::forVisit($encdate, \OpenEMR\Services\Insurance\CoverageDay::today());
-    return (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows((int)$patient_id, $day);
+    $day = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))
+        ->forVisit(is_string($encdate) ? $encdate : null);
+    return array_map(
+        static fn(\OpenEMR\Services\Insurance\EffectiveInsuranceRow $row): array => $row->columns,
+        (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(is_numeric($patient_id) ? (int)$patient_id : 0, $day)
+    );
 }
 
 /**

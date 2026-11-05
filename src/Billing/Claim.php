@@ -279,11 +279,11 @@ class Claim
         // coverage service (its rule differs from this loop's old SQL on a zero end date, two
         // undated rows at one level, and a company that isn't a whole number).
         $inForce = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
-            (int)$this->pid,
-            \OpenEMR\Services\Insurance\CoverageDay::forVisit($encounter_date, \OpenEMR\Services\Insurance\CoverageDay::today())
+            is_numeric($this->pid) ? (int)$this->pid : 0,
+            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($encounter_date)
         );
-        foreach ($inForce as $drow) {
-
+        foreach ($inForce as $effective) {
+            $drow = $effective->columns;
             $ins = count($this->payers);
             if (
                 (
