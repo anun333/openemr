@@ -31,6 +31,7 @@ use OpenEMR\Services\FHIR\Traits\BulkExportSupportAllOperationsTrait;
 use OpenEMR\Services\FHIR\Traits\FhirBulkExportDomainResourceTrait;
 use OpenEMR\Services\FHIR\Traits\FhirServiceBaseEmptyTrait;
 use OpenEMR\Services\FHIR\Traits\VersionedProfileTrait;
+use OpenEMR\Services\Insurance\CoverageDay;
 use OpenEMR\Services\InsuranceService;
 use OpenEMR\Services\Search\FhirSearchParameterDefinition;
 use OpenEMR\Services\Search\ISearchField;
@@ -234,14 +235,18 @@ class FhirCoverageService extends FhirServiceBase implements IPatientCompartment
             }
         }
 
-        // Period (Must Support) - coverage effective dates
-        if (!empty($dataRecord['date']) || !empty($dataRecord['date_end'])) {
+        // Period (Must Support) - coverage effective dates. A stored date that isn't a day (a zero
+        // date, which the coverage rule reads as no date) is left out, so the period is a valid FHIR
+        // Period (dateTime, per-1) and a zero end reads as open, as InsuranceService reads it.
+        $start = CoverageDay::fromStored($dataRecord['date'] ?? null);
+        $end = CoverageDay::fromStored($dataRecord['date_end'] ?? null);
+        if ($start !== null || $end !== null) {
             $period = new FHIRPeriod();
-            if (!empty($dataRecord['date'])) {
-                $period->setStart(new FHIRDateTime(UtilsService::getLocalDateAsUTC($dataRecord['date'])));
+            if ($start !== null) {
+                $period->setStart(new FHIRDateTime(UtilsService::getLocalDateAsUTC($start->format('Y-m-d'))));
             }
-            if (!empty($dataRecord['date_end'])) {
-                $period->setEnd(new FHIRDateTime(UtilsService::getLocalDateAsUTC($dataRecord['date_end'])));
+            if ($end !== null) {
+                $period->setEnd(new FHIRDateTime(UtilsService::getLocalDateAsUTC($end->format('Y-m-d'))));
             }
             $coverageResource->setPeriod($period);
         }
@@ -318,7 +323,7 @@ class FhirCoverageService extends FhirServiceBase implements IPatientCompartment
             $costTypeCoding = new FHIRCoding();
             $costTypeCoding->setSystem("http://terminology.hl7.org/CodeSystem/coverage-copay-type");
             $costTypeCoding->setCode("copay");
-            $costTypeCoding->setDisplay("Copay");
+            $costTypeCoding->setDisplay("Copay Amount"); // the coverage-copay-type code system's display
             $costType->addCoding($costTypeCoding);
             $costToBeneficiary->setType($costType);
 
@@ -350,12 +355,14 @@ class FhirCoverageService extends FhirServiceBase implements IPatientCompartment
     {
         $now = date('Y-m-d');
 
-        if (empty($dataRecord['date'])) {
+        // The dates as the period reads them: a zero or invalid stored date is none.
+        $startDay = CoverageDay::fromStored($dataRecord['date'] ?? null);
+        if ($startDay === null) {
             return 'active';
         }
 
-        $startDate = $dataRecord['date'];
-        $endDate = $dataRecord['date_end'] ?? null;
+        $startDate = $startDay->format('Y-m-d');
+        $endDate = CoverageDay::fromStored($dataRecord['date_end'] ?? null)?->format('Y-m-d');
 
         // Future coverage
         if ($startDate > $now) {

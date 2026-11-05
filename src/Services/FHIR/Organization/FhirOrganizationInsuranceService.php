@@ -14,6 +14,7 @@ namespace OpenEMR\Services\FHIR\Organization;
 use Lcobucci\Clock\SystemClock;
 use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Common\ValueObjects\PhoneNumber;
+use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\FHIR\R4\FHIRDomainResource\FHIROrganization;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRAddress;
 use OpenEMR\FHIR\R4\FHIRElement\FHIRAddressUse;
@@ -156,14 +157,22 @@ class FhirOrganizationInsuranceService extends FhirServiceBase implements INonPa
         $id->setValue($dataRecord['uuid']);
         $organizationResource->setId($id);
 
-        $identifiers = [
-            'cms_id' => FhirCodeSystemConstants::HL7_IDENTIFIER_TYPE_TABLE
-            ,'alt_cms_id' => FhirCodeSystemConstants::HL7_IDENTIFIER_TYPE_TABLE
-        ];
-        foreach ($identifiers as $id => $system) {
+        // The payer ids (the CMS id the claim sends, then the alternate) as identifiers typed NIIP,
+        // "National Insurance Payor Identifier (Payor)" in the v2-0203 identifier types. The table's
+        // URL was the identifier's system before, which names no namespace of payer ids (the FHIR
+        // validator: "No definition could be found"); a site with insurance_us_specs off keeps it.
+        $typed = OEGlobalsBag::getInstance()->getBoolean('insurance_us_specs', true);
+        foreach (['cms_id', 'alt_cms_id'] as $id) {
             if (!empty($dataRecord[$id])) {
                 $identifier = new FHIRIdentifier();
-                $identifier->setSystem($system);
+                if ($typed) {
+                    $identifier->setType(UtilsService::createCodeableConcept([
+                        'NIIP' => ['code' => 'NIIP', 'description' => 'National Insurance Payor Identifier (Payor)',
+                            'system' => FhirCodeSystemConstants::HL7_V2_IDENTIFIER_TYPE]
+                    ]));
+                } else {
+                    $identifier->setSystem(FhirCodeSystemConstants::HL7_IDENTIFIER_TYPE_TABLE);
+                }
                 $identifier->setValue($dataRecord[$id]);
                 $organizationResource->addIdentifier($identifier);
             }
@@ -372,7 +381,15 @@ class FhirOrganizationInsuranceService extends FhirServiceBase implements INonPa
         }
 
         foreach ($fhirResource->getIdentifier() as $identifier) {
-            if (self::primitiveText($identifier->getSystem()) === FhirCodeSystemConstants::HL7_IDENTIFIER_TYPE_TABLE) {
+            // A payer id: typed NIIP, as the read side writes it, or under the table's URL, as it did before.
+            $json = json_decode((string)json_encode($identifier), true);
+            $type = is_array($json) ? ($json['type'] ?? null) : null;
+            $codings = is_array($type) && is_array($type['coding'] ?? null) ? $type['coding'] : [];
+            $niip = false;
+            foreach ($codings as $coding) {
+                $niip = $niip || (is_array($coding) && ($coding['code'] ?? null) === 'NIIP');
+            }
+            if ($niip || self::primitiveText($identifier->getSystem()) === FhirCodeSystemConstants::HL7_IDENTIFIER_TYPE_TABLE) {
                 // The company holds two: the first is its CMS id, the second its alternate.
                 if ($data['cms_id'] === null) {
                     $data['cms_id'] = self::primitiveText($identifier->getValue());

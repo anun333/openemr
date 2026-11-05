@@ -62,6 +62,8 @@ class FhirCodeSystemConstants
     const OID_CLINICAL_LABORATORY_IMPROVEMENT_ACT_NUMBER = "urn:oid:2.16.840.1.113883.4.7";
 
     const HL7_IDENTIFIER_TYPE_TABLE = "http://hl7.org/fhir/v2/0203";
+    // The v2-0203 identifier types as a code system (HL7_IDENTIFIER_TYPE_TABLE is the table's old page, not a code system).
+    const HL7_V2_IDENTIFIER_TYPE = "http://terminology.hl7.org/CodeSystem/v2-0203";
 
     const HL7_ORGANIZATION_TYPE = "http://terminology.hl7.org/CodeSystem/organization-type";
 

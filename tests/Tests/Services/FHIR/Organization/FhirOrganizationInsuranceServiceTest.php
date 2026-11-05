@@ -88,6 +88,7 @@ class FhirOrganizationInsuranceServiceTest extends TestCase
         return [
             'deserialized from a request, primitives as strings' => [self::deserialized(...)],
             'built in code, primitives as typed elements' => [self::typed(...)],
+            'payer ids typed NIIP, as the read side writes them' => [self::niipTyped(...)],
         ];
     }
 
@@ -351,6 +352,53 @@ class FhirOrganizationInsuranceServiceTest extends TestCase
                 'country' => 'US',
             ]],
         ]);
+    }
+
+    /**
+     * The request shape with the payer ids as the read side writes them since US Core's
+     * Organization check: no system, typed NIIP (v2-0203). The other identifier is ignored.
+     */
+    private static function niipTyped(): FHIROrganization
+    {
+        $niip = ['coding' => [['system' => FhirCodeSystemConstants::HL7_V2_IDENTIFIER_TYPE, 'code' => 'NIIP']]];
+        return FhirOrganizationSerializer::deserialize([
+            'resourceType' => 'Organization',
+            'name' => self::NAME,
+            'identifier' => [
+                ['type' => $niip, 'value' => 'PAYER1'],
+                ['system' => 'http://example.org/other', 'value' => 'IGNORED'],
+                ['type' => $niip, 'value' => 'PAYER2'],
+                ['type' => $niip, 'value' => 'PAYER3'],
+            ],
+            'telecom' => [
+                ['system' => 'fax', 'value' => '(555) 200-9999'],
+                ['system' => 'phone', 'value' => '(555) 200-3003'],
+            ],
+            'address' => [[
+                'line' => ['4 Workbench Way', 'Suite 200', 'Floor 3'],
+                'city' => 'Testville',
+                'state' => 'CA',
+                'postalCode' => '90001',
+                'country' => 'US',
+            ]],
+        ]);
+    }
+
+    #[Test]
+    public function writesThePayerIdsTypedNiip(): void
+    {
+        $organization = (new FhirOrganizationInsuranceService())->parseOpenEMRRecord(
+            ['uuid' => '0b8d8f8a-1b2c-4d3e-8f9a-0b1c2d3e4f50', 'name' => self::NAME, 'inactive' => '0', 'cms_id' => 'PAYER1', 'alt_cms_id' => 'PAYER2']
+        );
+        $ids = [];
+        foreach ($organization->getIdentifier() as $identifier) {
+            $coding = $identifier->getType()->getCoding()[0] ?? null;
+            $ids[] = [(string)$identifier->getSystem(), (string)$coding?->getSystem(), (string)$coding?->getCode(), (string)$identifier->getValue()];
+        }
+        $this->assertSame([
+            ['', FhirCodeSystemConstants::HL7_V2_IDENTIFIER_TYPE, 'NIIP', 'PAYER1'],
+            ['', FhirCodeSystemConstants::HL7_V2_IDENTIFIER_TYPE, 'NIIP', 'PAYER2'],
+        ], $ids);
     }
 
     private static function typed(): FHIROrganization

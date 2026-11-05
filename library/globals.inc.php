@@ -1544,6 +1544,13 @@ $GLOBALS_METADATA = [
             xl('Enable percent-based price levels')
         ],
 
+        'insurance_us_specs' => [
+            xl('Insurance Output Follows the US Specifications'),
+            'bool',                           // data type
+            '1',                              // default = true
+            xl('The insurer\'s payer ids in FHIR follow US Core, the dates an eligibility response stores follow X12 5010, and the eCQM payer follows QDM. Off keeps the output of earlier versions.')
+        ],
+
         'gen_x12_based_on_ins_co' => [
             xl('Generate X-12 Based On Insurance Company'),
             'bool',                           // data type
