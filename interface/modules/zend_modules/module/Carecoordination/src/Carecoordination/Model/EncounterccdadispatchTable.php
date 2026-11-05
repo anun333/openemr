@@ -4925,8 +4925,12 @@ class EncounterccdadispatchTable
     public function getPayers($pid): string
     {
         $xml = "<payers>";
-        // $types = ['primary', 'secondary', 'tertiary'];
-        $types = ['primary'];
+        // C-CDA R2.1 Payers Section (V3): an entry per payer (CONF:1198-7959), each policy with its place in the
+        // coordination of benefits (the Coverage Activity's sequenceNumber): every payer in force on the document's
+        // day, in level order. With insurance_us_specs off, the primary only, as before.
+        $types = \OpenEMR\Core\OEGlobalsBag::getInstance()->getBoolean('insurance_us_specs', true)
+            ? ['primary', 'secondary', 'tertiary'] : ['primary'];
+        $sequence = 0;
 
         foreach ($types as $type) {
             // The policy with its company (the coverage service), then the company's address and work phone and
@@ -4962,6 +4966,7 @@ class EncounterccdadispatchTable
             if (!$row) {
                 continue; // no data for this type
             }
+            $sequence++; // the payer's place among those the section lists: 1, 2, 3
             $cuuid = xmlEscape(UuidRegistry::uuidToString($row['compuuid']));
             $puuid = xmlEscape(UuidRegistry::uuidToString($row['piduuid']));
 
@@ -4998,6 +5003,7 @@ class EncounterccdadispatchTable
             $authCode = '72'; // default auth code for self pay. Unsure how we handle in billing for if insurance company auth use and when.
             $xml .= <<<XML
   <payer>
+    <sequence>{$sequence}</sequence>
     <identifiers>
       <identifier>{$cuuid}</identifier>
     </identifiers>

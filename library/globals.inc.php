@@ -1548,7 +1548,7 @@ $GLOBALS_METADATA = [
             xl('Insurance Output Follows the US Specifications'),
             'bool',                           // data type
             '1',                              // default = true
-            xl('The insurer\'s payer ids in FHIR follow US Core, the dates an eligibility response stores follow X12 5010, and the eCQM payer follows QDM. Off keeps the output of earlier versions.')
+            xl('The insurer\'s payer ids in FHIR follow US Core, the dates an eligibility response stores follow X12 5010, the C-CDA payers section lists every payer in force (C-CDA R2.1), and the eCQM payer follows QDM. Off keeps the output of earlier versions.')
         ],
 
         'x12_5010_payer_rules' => [
