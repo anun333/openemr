@@ -202,13 +202,13 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
     while ($row = sqlFetchArray($res)) {
         $patient_id = $row['pid'];
         $encounter_date = $row['date'];
-        $irow = sqlQuery("SELECT insurance_companies.name " .
-        "FROM insurance_data, insurance_companies WHERE " .
-        "insurance_data.pid = ? AND " .
-        "insurance_data.type = 'primary' AND " .
-        "(insurance_data.date <= ? OR insurance_data.date IS NULL) AND " .
-        "insurance_companies.id = insurance_data.provider " .
-        "ORDER BY insurance_data.date DESC LIMIT 1", [$patient_id, $encounter_date]);
+        // Twin (insurance-reference): the primary in force on the visit date, through the coverage
+        // service (master: the latest-starting primary, ended or not).
+        $primaryRow = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
+            is_numeric($patient_id) ? (int)$patient_id : 0,
+            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($encounter_date) ? $encounter_date : null)
+        )[0] ?? null;
+        $irow = $primaryRow?->policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary ? ['name' => $primaryRow->companyName] : [];
         $plan = (!empty($irow['name'])) ? $irow['name'] : '-- No Insurance --';
         $insarr[$plan]['visits'] ??= 0;
         $insarr[$plan]['visits'] += 1;
