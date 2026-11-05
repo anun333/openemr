@@ -269,7 +269,7 @@ class SLEOB
         $policy = (new InsuranceService())->getEffectiveInsuranceAt(
             is_numeric($patient_id) ? (int)$patient_id : 0,
             $level,
-            (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date_of_service) ? $date_of_service : null)
+            (new CoverageDay(ServiceContainer::getClock()))->forVisit($date_of_service)
         );
         return $policy === null ? 0 : $policy->companyId;
     }

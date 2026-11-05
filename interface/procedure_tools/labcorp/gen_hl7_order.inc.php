@@ -92,7 +92,7 @@ function labcorp_loadPayerInfo($pid, $date = ''): array
 {
     // Twin (insurance-reference): the coverage service's policies in force on
     // the day, so an ended plan is not billed and an undated one is.
-    $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
+    $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit($date);
     $payers = [];
     foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
         $drow = $effective->columns;
@@ -337,8 +337,8 @@ function labcorp_gen_hl7_order(int $orderid): Hl7OrderResult
         // Insurance stuff.
     // Twin (insurance-reference): DEFAULT 1 (#15038), the collection date, else the order date.
     $labDay = (new CoverageDay(ServiceContainer::getClock()))->forLabOrder(
-        is_string($porow['date_collected'] ?? null) ? $porow['date_collected'] : null,
-        is_string($porow['date_ordered'] ?? null) ? $porow['date_ordered'] : null
+        $porow['date_collected'] ?? null,
+        $porow['date_ordered'] ?? null
     )->format('Y-m-d');
     $payers = labcorp_loadPayerInfo($porow['pid'], $labDay);
     $setid = 0;

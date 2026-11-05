@@ -486,7 +486,7 @@ foreach ($pid_list as $pid) {
                     // service (else today); master printed each level's latest-starting row, ended or not.
                     $firstAppointment = $appointment[0] ?? null;
                     $eventDate = is_array($firstAppointment) ? ($firstAppointment['pc_eventDate'] ?? null) : null;
-                    $printDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($eventDate) ? $eventDate : null);
+                    $printDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($eventDate);
                     foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $printDay) as $effective) {
                         $row = $effective->columns;
                         $instype = $effective->policy->level->value;

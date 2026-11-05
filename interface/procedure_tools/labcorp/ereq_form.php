@@ -406,8 +406,8 @@ STYLES;
         // collection date, else order date), as the HL7 IN1 sends it; id is the company's, as before.
         $primary = [];
         $labDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
-            is_string($procedure['date_collected'] ?? null) ? $procedure['date_collected'] : null,
-            is_string($procedure['date_ordered'] ?? null) ? $procedure['date_ordered'] : null
+            $procedure['date_collected'] ?? null,
+            $procedure['date_ordered'] ?? null
         );
         foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $labDay) as $effective) {
             $policyRow = $effective->columns;
