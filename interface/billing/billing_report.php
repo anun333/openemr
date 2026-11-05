@@ -1158,9 +1158,10 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                                         // Twin (insurance-reference): preselect the level after the last one closed, by
                                         // level. Master compared the list position with the level closed, which held only
                                         // while getEffectiveInsurances() stopped at the first level with nothing in force.
-                                        $rowLevel = ['primary' => 1, 'secondary' => 2, 'tertiary' => 3][$row['type']] ?? 0;
+                                        $rowType = is_array($row) ? ($row['type'] ?? null) : null;
+                                        $rowLevel = is_string($rowType) ? (['primary' => 1, 'secondary' => 2, 'tertiary' => 3][$rowType] ?? 0) : 0;
                                         if (
-                                            $rowLevel == $last_level_closed + 1
+                                            $rowLevel == (is_numeric($last_level_closed) ? (int)$last_level_closed : 0) + 1
                                             || $insuranceCount == 1
                                         ) {
                                             $lhtml .= " selected";

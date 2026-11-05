@@ -502,7 +502,8 @@ class InsuranceService extends BaseService
         foreach ($result as $key => $policies) {
             if (count($policies) > 0) {
                 foreach ($policies as $i => $policy) {
-                    if (isset($inForce[$key]) && (int)($policy['id'] ?? 0) === $inForce[$key]) {
+                    $policyId = is_array($policy) ? ($policy['id'] ?? null) : null;
+                    if (isset($inForce[$key]) && is_numeric($policyId) && (int)$policyId === $inForce[$key]) {
                         array_unshift($policies, ...array_splice($policies, $i, 1));
                         break;
                     }

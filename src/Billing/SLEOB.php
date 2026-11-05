@@ -261,7 +261,7 @@ class SLEOB
         // through the coverage service (ERA and manual posting, the secondary claim, batch
         // payments, collections). Master's own SQL read a zero end date as ended and broke a tie
         // between two undated rows by database order; it returned the stored provider text.
-        $level = [1 => InsuranceLevel::Primary, 2 => InsuranceLevel::Secondary, 3 => InsuranceLevel::Tertiary][(int)$payer_type];
+        $level = [1 => InsuranceLevel::Primary, 2 => InsuranceLevel::Secondary, 3 => InsuranceLevel::Tertiary][is_numeric($payer_type) ? (int)$payer_type : 0];
         $policy = (new InsuranceService())->getEffectiveInsuranceAt(
             is_numeric($patient_id) ? (int)$patient_id : 0,
             $level,

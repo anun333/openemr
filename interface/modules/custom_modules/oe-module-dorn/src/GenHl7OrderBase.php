@@ -231,9 +231,9 @@ class GenHl7OrderBase
     {
         // Twin (insurance-reference): the coverage service's policies in force
         // on the day; master ignored the end date.
-        $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit(is_string($date) ? $date : null);
+        $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit($date);
         $payers = [];
-        foreach ((new InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $day) as $effective) {
+        foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
             $drow = $effective->columns;
             $ins = count($payers);
             $crow = sqlQuery("SELECT * FROM insurance_companies WHERE id = ?", [$drow['provider']]);

@@ -36,25 +36,6 @@ use OpenEMR\Common\Utils\FormatMoney;
 use OpenEMR\Core\Header;
 use OpenEMR\Core\OEGlobalsBag;
 
-/**
- * Twin (insurance-reference): the insurance_data row of the policy at a level in force on a day
- * (the coverage service), or [] when none is.
- *
- * @return array<mixed>
- */
-function collections_policy_on(mixed $patientId, string $type, mixed $day): array
-{
-    $rows = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
-        is_numeric($patientId) ? (int)$patientId : 0,
-        (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($day) ? $day : null)
-    );
-    foreach ($rows as $row) {
-        if ($row->policy->level->value === $type) {
-            return $row->columns;
-        }
-    }
-    return [];
-}
 
 $session = SessionWrapperFactory::getInstance()->getActiveSession();
 if (!empty($_POST)) {
@@ -982,17 +963,29 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_export']) || !empty($_
             $row['inactive_days'] = floor((time() - $latime) / (60 * 60 * 24));
         }
 
+        // Twin (insurance-reference): the insurance_data row of the policy at a level in force on the date of
+        // service (the coverage service), or [] when none is; master read the latest-starting row, ended or not.
+        $collectionsPolicyOn = static function (mixed $patientId, string $type, mixed $day): array {
+            $rows = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
+                is_numeric($patientId) ? (int)$patientId : 0,
+                (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit(is_string($day) ? $day : null)
+            );
+            foreach ($rows as $row) {
+                if ($row->policy->level->value === $type) {
+                    return $row->columns;
+                }
+            }
+            return [];
+        };
         // Look up insurance policy number if we need it.
         if ($form_cb_policy) {
             $instype = ($insposition == 2) ? 'secondary' : (($insposition == 3) ? 'tertiary' : 'primary');
-            // Twin (insurance-reference): the policy at that level in force on the date of service
-            // (master: the latest-starting one, ended or not).
-            $insrow = collections_policy_on($patient_id, $instype, $svcdate);
+            $insrow = $collectionsPolicyOn($patient_id, $instype, $svcdate);
             $row['policy'] = $insrow['policy_number'] ?? '';
         }
         if ($form_cb_group_number) {
             $instype = ($insposition == 2) ? 'secondary' : (($insposition == 3) ? 'tertiary' : 'primary');
-            $insrow = collections_policy_on($patient_id, $instype, $svcdate);
+            $insrow = $collectionsPolicyOn($patient_id, $instype, $svcdate);
             $row['groupnumber'] = $insrow['group_number'] ?? null;
         }
 
