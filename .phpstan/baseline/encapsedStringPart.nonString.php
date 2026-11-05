@@ -2043,7 +2043,7 @@ $ignoreErrors[] = [
 ];
 $ignoreErrors[] = [
     'message' => '#^Part \\$given \\(mixed\\) of encapsed string cannot be cast to string\\.$#',
-    'count' => 15,
+    'count' => 11,
     'path' => __DIR__ . '/../../library/patient.inc.php',
 ];
 $ignoreErrors[] = [

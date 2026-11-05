@@ -807,11 +807,6 @@ $ignoreErrors[] = [
     'path' => __DIR__ . '/../../library/maviq_phone_api.php',
 ];
 $ignoreErrors[] = [
-    'message' => '#^Offset 0 might not exist on array\\{\\}\\|array\\{non\\-empty\\-string\\}\\.$#',
-    'count' => 1,
-    'path' => __DIR__ . '/../../library/patient.inc.php',
-];
-$ignoreErrors[] = [
     'message' => '#^Offset \'number_inactivated_reminders\' does not exist on array\\{total_active_actions\\: \\(array\\|float\\|int\\), total_pre_active_reminders\\: \\(array\\|float\\|int\\), total_pre_unsent_reminders\\: \\(array\\|float\\|int\\), number_new_reminders\\: \\(array\\|float\\|int\\), number_updated_reminders\\: \\(array\\|float\\|int\\), number_unchanged_reminders\\: \\(array\\|float\\|int\\)\\}\\.$#',
     'count' => 1,
     'path' => __DIR__ . '/../../library/reminders.php',

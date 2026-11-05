@@ -25,11 +25,9 @@ use OpenEMR\Core\OEGlobalsBag;
 // later
 function getInsuranceCompanies($pid): array
 {
-    $res = sqlStatement("SELECT * FROM insurance_data WHERE pid = ? " .
-    "ORDER BY type ASC, date DESC", [$pid]);
     $prevtype = '';
     $all = [];
-    for ($iter = 0; $row = sqlFetchArray($res); $iter++) {
+    foreach (\OpenEMR\Services\Insurance\PolicyRecords::allByLevelLatestFirst($pid) as $iter => $row) {
         if (strcmp((string) $row['type'], (string) $prevtype) == 0) {
             continue;
         }

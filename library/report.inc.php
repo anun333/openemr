@@ -152,9 +152,7 @@ function getHistoryReport($pid)
 
 function getInsuranceReport($pid, $type = "primary")
 {
-    $sql = "select * from insurance_data where pid=? and type=? order by date ASC";
-    $res = sqlStatement($sql, [$pid, $type]);
-    while ($list = sqlFetchArray($res)) {
+    foreach (\OpenEMR\Services\Insurance\PolicyRecords::historyOldestFirst($pid, $type) as $list) {
         foreach ($list as $key => $value) {
             if ($ret[$key]['content'] != $value && $ret[$key]['date'] < $list['date']) {
                 $ret[$key]['content'] = $value;
@@ -477,11 +475,9 @@ function getRecInsuranceData($pid, $ins_type): array
     //column name->dates->values
     //$return["lname"][0..n]["date"]
     //$return["lname"][0..n]["value"]
-    $res = sqlStatement("select *, ic.name as provider_name from insurance_data left join insurance_companies as ic on ic.id = provider where pid=? and type=? order by date", [$pid,$ins_type]);
-
     $retar = [];
     $arcount = [];
-    while ($result = sqlFetchArray($res)) {
+    foreach (\OpenEMR\Services\Insurance\PolicyRecords::historyWithPayerName($pid, $ins_type) as $result) {
         foreach ($result as $key => $val) {
             if (in_array($key, ["pid", "date", "id", "uuid"])) {
                 continue;

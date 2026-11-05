@@ -29207,11 +29207,6 @@ $ignoreErrors[] = [
     'path' => __DIR__ . '/../../library/lab.inc.php',
 ];
 $ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'subscriber_relationship\' on array\\|false\\.$#',
-    'count' => 1,
-    'path' => __DIR__ . '/../../library/lab.inc.php',
-];
-$ignoreErrors[] = [
     'message' => '#^Cannot access offset \'upin\' on array\\|false\\.$#',
     'count' => 1,
     'path' => __DIR__ . '/../../library/lab.inc.php',
@@ -29589,11 +29584,6 @@ $ignoreErrors[] = [
 $ignoreErrors[] = [
     'message' => '#^Cannot access offset \'postal_code\' on mixed\\.$#',
     'count' => 2,
-    'path' => __DIR__ . '/../../library/patient.inc.php',
-];
-$ignoreErrors[] = [
-    'message' => '#^Cannot access offset \'provider_name\' on array\\|false\\.$#',
-    'count' => 1,
     'path' => __DIR__ . '/../../library/patient.inc.php',
 ];
 $ignoreErrors[] = [

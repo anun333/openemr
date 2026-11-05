@@ -26,6 +26,8 @@ use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\EmployerService;
 use OpenEMR\Services\FacilityService;
+use OpenEMR\Services\Insurance\PolicyRecords;
+use OpenEMR\Services\Insurance\PolicySave;
 use OpenEMR\Services\InsuranceCompanyService;
 use OpenEMR\Services\PatientService;
 use OpenEMR\Services\SocialHistoryService;
@@ -51,41 +53,14 @@ function getPatientData($pid, $given = "*, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS
 
 function getInsuranceProvider($ins_id)
 {
-
-    $sql = "select name from insurance_companies where id=?";
-    $row = sqlQuery($sql, [$ins_id]);
-    return $row['name'] ?? '';
+    return InsuranceCompanyService::nameOf($ins_id) ?? '';
 }
 
 function getInsuranceProviders(): array
 {
-    $returnval = [];
-
-    if (true) {
-        $sql = "select name, id from insurance_companies where inactive != 1 order by name, id";
-        $rez = sqlStatement($sql);
-        for ($iter = 0; $row = sqlFetchArray($rez); $iter++) {
-            $returnval[$row['id']] = $row['name'];
-        }
-    } else { // Please leave this here. I have a user who wants to see zip codes and PO
-        // box numbers listed along with the insurance company names, as many companies
-        // have different billing addresses for different plans.  -- Rod Roark
-        $sql = "select insurance_companies.name, insurance_companies.id, " .
-          "addresses.zip, addresses.line1 " .
-          "from insurance_companies, addresses " .
-          "where addresses.foreign_id = insurance_companies.id " .
-          "order by insurance_companies.name, addresses.zip";
-
-        $rez = sqlStatement($sql);
-
-        for ($iter = 0; $row = sqlFetchArray($rez); $iter++) {
-            preg_match("/\d+/", (string) $row['line1'], $matches);
-            $returnval[$row['id']] = $row['name'] . " (" . $row['zip'] .
-              "," . $matches[0] . ")";
-        }
-    }
-
-    return $returnval;
+    // The display with each company's zip and street number stays in the service
+    // (InsuranceCompanyService::namesWithZipById()), as the old code kept it here for a site that wanted it.
+    return InsuranceCompanyService::activeNamesById();
 }
 
 /**
@@ -96,16 +71,7 @@ function getInsuranceProvidersExtra(): array
     $returnval = [];
     // add a global and if for where to allow inactive inscompanies
 
-    $sql = "SELECT insurance_companies.name, insurance_companies.id, insurance_companies.cms_id,
-            addresses.line1, addresses.line2, addresses.city, addresses.state, addresses.zip
-            FROM insurance_companies, addresses
-            WHERE addresses.foreign_id = insurance_companies.id
-            AND insurance_companies.inactive != 1
-            ORDER BY insurance_companies.name, addresses.zip";
-
-    $rez = sqlStatement($sql);
-
-    for ($iter = 0; $row = sqlFetchArray($rez); $iter++) {
+    foreach (InsuranceCompanyService::activeWithAddress() as $row) {
         $displayName = InsuranceCompanyService::getDisplayNameForInsuranceRecord($row);
         $returnval[$row['id']] = $displayName;
     }
@@ -336,21 +302,20 @@ function getHistoryData($pid, $given = "*", $dateStart = '', $dateEnd = '')
 // function getInsuranceData($pid, $type = "primary", $given = "insd.*, DATE_FORMAT(subscriber_DOB,'%m/%d/%Y') as subscriber_DOB, ic.name as provider_name")
 // To prevent sql injection on this function, if a variable is used for $given parameter, then
 // it needs to be escaped via whitelisting prior to using this function.
+/**
+ * @param string $given a select list over insd (the policy) and ic (its company)
+ */
 function getInsuranceData($pid, $type = "primary", $given = "insd.*, ic.name as provider_name")
 {
-    $sql = "select $given from insurance_data as insd " .
-    "left join insurance_companies as ic on ic.id = insd.provider " .
-    "where pid = ? and type = ? order by date DESC limit 1";
-    return sqlQuery($sql, [$pid, $type]);
+    return PolicyRecords::latestAtLevel($pid, $type, $given);
 }
 
+/**
+ * @param string $given a select list over insd (the policy) and ic (its company)
+ */
 function getInsuranceDataNew($pid, $type = "primary", $given = "insd.*, ic.name as provider_name")
 {
-    $sql = "select $given from insurance_data as insd " .
-    "left join insurance_companies as ic on ic.id = insd.provider " .
-    "where pid = ? and type = ? order by date DESC";
-    $sql_res = sqlStatement($sql, [$pid, $type]);
-    while ($row = sqlFetchArray($sql_res)) {
+    foreach (PolicyRecords::historyAtLevel($pid, $type, $given) as $row) {
         $insarr[] = $row;
     };
 
@@ -359,6 +324,9 @@ function getInsuranceDataNew($pid, $type = "primary", $given = "insd.*, ic.name 
 
 // To prevent sql injection on this function, if a variable is used for $given parameter, then
 // it needs to be escaped via whitelisting prior to using this function.
+/**
+ * @param string $given a select list over insd (the policy) and ic (its company)
+ */
 function getInsuranceDataByDate(
     $pid,
     $date,
@@ -371,12 +339,7 @@ function getInsuranceDataByDate(
    given date and before the insurance end date. It will call up most recent records up to and on the date given,
    but not records entered after the given date.
    */
-    $sql = "select $given from insurance_data as insd " .
-    "left join insurance_companies as ic on ic.id = provider " .
-    "where pid = ? and (date_format(date,'%Y-%m-%d') <= ? OR date IS NULL) and " .
-    "(date_format(date_end,'%Y-%m-%d') >= ? OR date_end IS NULL) and " .
-    "type = ? order by date DESC limit 1";
-    return sqlQuery($sql, [$pid, $date, $date, $type]);
+    return PolicyRecords::onDateAtLevel($pid, $date, $type, $given);
 }
 
 function get_unallocated_patient_balance($pid): string
@@ -396,6 +359,9 @@ function get_unallocated_patient_balance($pid): string
     return sprintf('%01.2f', $unallocated);
 }
 
+/**
+ * @param string $given a select list over insd (the policy) and ic (its company)
+ */
 function getInsuranceNameByDate(
     $pid,
     $date,
@@ -406,14 +372,8 @@ function getInsuranceNameByDate(
   // this function recalls the insurance value that was most recently enterred from the
   // given date. it will call up most recent records up to and on the date given,
   // but not records enterred after the given date
-    $sql = "select $given from insurance_data as insd " .
-    "left join insurance_companies as ic on ic.id = provider " .
-    "where pid = ? and (date_format(date,'%Y-%m-%d') <= ? OR date IS NULL) and " .
-    "(date_format(date_end,'%Y-%m-%d') >= ? OR date_end IS NULL) and " .
-    "type = ? order by date DESC limit 1";
-
-    $row = sqlQuery($sql, [$pid, $date, $date, $type]);
-    return $row['provider_name'];
+    $row = PolicyRecords::onDateAtLevel($pid, $date, $type, $given);
+    return is_array($row) ? $row['provider_name'] : null;
 }
 
 /**
@@ -1261,95 +1221,45 @@ function newInsuranceData(
         $effective_date_end = null;
     }
 
-    return sqlInsert(
-        "INSERT INTO `insurance_data` SET `type` = ?,
-        `provider` = ?,
-        `policy_number` = ?,
-        `group_number` = ?,
-        `plan_name` = ?,
-        `subscriber_lname` = ?,
-        `subscriber_mname` = ?,
-        `subscriber_fname` = ?,
-        `subscriber_relationship` = ?,
-        `subscriber_ss` = ?,
-        `subscriber_DOB` = ?,
-        `subscriber_street` = ?,
-        `subscriber_postal_code` = ?,
-        `subscriber_city` = ?,
-        `subscriber_state` = ?,
-        `subscriber_country` = ?,
-        `subscriber_phone` = ?,
-        `subscriber_employer` = ?,
-        `subscriber_employer_city` = ?,
-        `subscriber_employer_street` = ?,
-        `subscriber_employer_postal_code` = ?,
-        `subscriber_employer_state` = ?,
-        `subscriber_employer_country` = ?,
-        `copay` = ?,
-        `subscriber_sex` = ?,
-        `pid` = ?,
-        `date` = ?,
-        `accept_assignment` = ?,
-        `policy_type` = ?,
-        `date_end` = ?",
-        [
-            $type,
-            $provider,
-            $policy_number,
-            $group_number,
-            $plan_name,
-            $subscriber_lname,
-            $subscriber_mname,
-            $subscriber_fname,
-            $subscriber_relationship,
-            $subscriber_ss,
-            $subscriber_DOB,
-            $subscriber_street,
-            $subscriber_postal_code,
-            $subscriber_city,
-            $subscriber_state,
-            $subscriber_country,
-            $subscriber_phone,
-            $subscriber_employer,
-            $subscriber_employer_city,
-            $subscriber_employer_street,
-            $subscriber_employer_postal_code,
-            $subscriber_employer_state,
-            $subscriber_employer_country,
-            $copay,
-            $subscriber_sex,
-            $pid,
-            $effective_date,
-            $accept_assignment,
-            $policy_type,
-            $effective_date_end
-        ]
-    );
+    return PolicySave::insert([
+        'type' => $type,
+        'provider' => $provider,
+        'policy_number' => $policy_number,
+        'group_number' => $group_number,
+        'plan_name' => $plan_name,
+        'subscriber_lname' => $subscriber_lname,
+        'subscriber_mname' => $subscriber_mname,
+        'subscriber_fname' => $subscriber_fname,
+        'subscriber_relationship' => $subscriber_relationship,
+        'subscriber_ss' => $subscriber_ss,
+        'subscriber_DOB' => $subscriber_DOB,
+        'subscriber_street' => $subscriber_street,
+        'subscriber_postal_code' => $subscriber_postal_code,
+        'subscriber_city' => $subscriber_city,
+        'subscriber_state' => $subscriber_state,
+        'subscriber_country' => $subscriber_country,
+        'subscriber_phone' => $subscriber_phone,
+        'subscriber_employer' => $subscriber_employer,
+        'subscriber_employer_city' => $subscriber_employer_city,
+        'subscriber_employer_street' => $subscriber_employer_street,
+        'subscriber_employer_postal_code' => $subscriber_employer_postal_code,
+        'subscriber_employer_state' => $subscriber_employer_state,
+        'subscriber_employer_country' => $subscriber_employer_country,
+        'copay' => $copay,
+        'subscriber_sex' => $subscriber_sex,
+        'pid' => $pid,
+        'date' => $effective_date,
+        'accept_assignment' => $accept_assignment,
+        'policy_type' => $policy_type,
+        'date_end' => $effective_date_end,
+    ]);
 }
 
 // This is used internally only.
 function updateInsuranceData($id, $new): void
 {
-    $fields = sqlListFields("insurance_data");
-    $use = [];
-
-    foreach ($new as $key => $value) {
-        if (in_array($key, $fields)) {
-            $use[$key] = $value;
-        }
-    }
-
-    $sqlBindArray = [];
-    $sql = "UPDATE insurance_data SET ";
-    foreach ($use as $key => $value) {
-        $sql .= "`" . $key . "` = ?, ";
-        array_push($sqlBindArray, $value);
-    }
-
-    $sql = substr($sql, 0, -2) . " WHERE id = ?";
-    array_push($sqlBindArray, $id);
-
-    sqlStatement($sql, $sqlBindArray);
+    // a non-list updates nothing, as the old loop over it did (and the statement then fails, as before)
+    PolicySave::update($id, is_iterable($new) ? $new : []);
 }
 
 function newHistoryData($pid, $new = false): void
@@ -1498,22 +1408,7 @@ function getEffectiveInsurances($patient_id, $encdate): array
  */
 function getAllinsurances($pid): array
 {
-    $insarr = [];
-    $sql = "SELECT a.type, a.provider, a.plan_name, a.policy_number, a.group_number,
-           a.subscriber_lname, a.subscriber_fname, a.subscriber_relationship, a.subscriber_employer,
-		   b.name, c.line1, c.line2, c.city, c.state, c.zip
-           FROM `insurance_data` AS a
-           RIGHT JOIN insurance_companies AS b
-           ON a.provider = b.id
-           RIGHT JOIN addresses AS c
-           ON a.provider = c.foreign_id
-           WHERE a.pid = ? ";
-    $inco = sqlStatement($sql, [$pid]);
-
-    while ($icl = sqlFetchArray($inco)) {
-        $insarr[] = $icl;
-    }
-    return $insarr;
+    return PolicyRecords::requisitionRows($pid);
 }
 
 /**

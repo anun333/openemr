@@ -72,10 +72,7 @@ function getProceduresInfo($oid, $encounter): array
 
 function getSelfPay($pid)
 {
-    $sql = "SELECT `subscriber_relationship` FROM `insurance_data` WHERE pid = ?";
-    $res = sqlQuery($sql, [$pid]);
-
-    return $res['subscriber_relationship'];
+    return \OpenEMR\Services\Insurance\PolicyRecords::firstSubscriberRelationship($pid);
 }
 
 /**
