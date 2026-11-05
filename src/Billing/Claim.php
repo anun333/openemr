@@ -295,7 +295,7 @@ class Claim
                 $ins = 0;
             }
 
-            $crow = sqlQuery("SELECT * FROM insurance_companies WHERE id = ?", [$drow['provider']]);
+            $crow = \OpenEMR\Services\InsuranceCompanyService::columnsOf($drow['provider']);
             $orow = new InsuranceCompany($drow['provider']);
             $this->payers[$ins] = [];
             $this->payers[$ins]['data']    = $drow;

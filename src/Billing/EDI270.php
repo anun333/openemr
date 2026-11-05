@@ -24,8 +24,6 @@
 
 namespace OpenEMR\Billing;
 
-use OpenEMR\Common\Database\QueryUtils;
-
 use edih_271_codes;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\MultipartStream;
@@ -411,9 +409,9 @@ class EDI270
                 continue;
             }
             $i = $effective->columns;
-            $c = QueryUtils::querySingleRow(
-                'SELECT cms_id, eligibility_id, x12_default_eligibility_id AS partner, name AS payer_name FROM insurance_companies WHERE id = ?',
-                [$i['provider']]
+            $c = \OpenEMR\Services\InsuranceCompanyService::columnsOf(
+                $i['provider'],
+                'cms_id, eligibility_id, x12_default_eligibility_id AS partner, name AS payer_name'
             );
             $ymd = static fn(mixed $d): ?string => is_string($d) && $d !== '' ? str_replace('-', '', substr($d, 0, 10)) : null;
             $out = array_merge($out, [
@@ -453,39 +451,40 @@ class EDI270
             p.pid,
             p.pubpid,
             p.providerID,
-            i.subscriber_ss,
-            i.policy_number,
-            i.provider as payer_id,
-            i.subscriber_relationship,
-            i.subscriber_lname,
-            i.subscriber_fname,
-            i.subscriber_mname,
-            DATE_FORMAT(i.subscriber_DOB, '%Y%m%d') as subscriber_dob,
-            i.policy_number,
-            i.subscriber_sex,
-            DATE_FORMAT(i.date, '%Y%m%d') as date,
             d.lname as provider_lname,
             d.fname as provider_fname,
             d.npi as provider_npi,
             d.upin as provider_pin,
             f.federal_ein as federal_ein,
             f.facility_npi as facility_npi,
-            f.name as facility_name,
-            c.cms_id as cms_id,
-            c.eligibility_id as eligibility_id,
-            c.x12_default_eligibility_id as partner,
-            c.name as payer_name
+            f.name as facility_name
         FROM patient_data AS p
         LEFT JOIN users AS d on (p.providerID = d.id)
         LEFT JOIN facility AS f on (f.id = d.facility_id)
-        LEFT JOIN insurance_data AS i ON (i.id =(SELECT id FROM insurance_data AS i WHERE pid = p.pid AND type = 'primary' ORDER BY date DESC LIMIT 1))
-        LEFT JOIN insurance_companies as c ON (c.id = i.provider)
         WHERE p.pid = ?";
         $res = sqlStatement($query, [$pid]);
         $resArray = [];
         while ($row = sqlFetchArray($res)) {
             $inForce = self::coverageColumns($pid, self::eligibilityDay(null, null));
-            $resArray[] = $inForce['payer_id'] === null ? $row : array_merge($row, $inForce);
+            if ($inForce['payer_id'] === null) {
+                // Master's choice: the latest-starting primary (the columns master's query joined), or none.
+                $latest = \OpenEMR\Services\Insurance\PolicyRecords::latestAtLevel(
+                    $pid,
+                    'primary',
+                    "insd.subscriber_ss, insd.policy_number, insd.provider as payer_id, insd.subscriber_relationship, " .
+                    "insd.subscriber_lname, insd.subscriber_fname, insd.subscriber_mname, " .
+                    "DATE_FORMAT(insd.subscriber_DOB, '%Y%m%d') as subscriber_dob, insd.subscriber_sex, " .
+                    // date_ymd, not date: an alias named date would be what "order by date" sorts by
+                    "DATE_FORMAT(insd.date, '%Y%m%d') as date_ymd, ic.cms_id as cms_id, ic.eligibility_id as eligibility_id, " .
+                    "ic.x12_default_eligibility_id as partner, ic.name as payer_name"
+                );
+                if (is_array($latest)) {
+                    $latest['date'] = $latest['date_ymd'];
+                    unset($latest['date_ymd']);
+                }
+                $inForce = array_merge(array_fill_keys(array_keys($inForce), null), is_array($latest) ? $latest : []);
+            }
+            $resArray[] = array_merge($row, $inForce);
         }
         return $resArray;
     }
@@ -674,22 +673,11 @@ HTML;
     // To Show Eligibility Verification data
     public static function showEligibilityInformation($pid, $flag = false)
     {
-        $query =
-            "SELECT eligr.*, eligv.insurance_id, eligv.copay, insd.pid, insc.name, " .
-            "Date_Format(eligv.eligibility_check_date, '%W %M %e, %Y %h:%i %p') AS verificationDate " .
-            "FROM eligibility_verification eligv " .
-            "INNER JOIN benefit_eligibility eligr ON eligr.verification_id = eligv.verification_id " .
-            "INNER JOIN insurance_data insd ON insd.id = eligv.insurance_id " .
-            "INNER JOIN insurance_companies insc ON insc.id = insd.provider " .
-            "WHERE insd.pid = ? AND eligv.eligibility_check_date = " .
-            "(SELECT Max(eligibility_verification.eligibility_check_date) FROM eligibility_verification " .
-            "WHERE eligibility_verification.insurance_id = eligv.insurance_id)";
-        $result = sqlStatement($query, [$pid]);
 
         $showString = "<div class='row'>";
         $col = 1;
         $title = 1;
-        while ($benefit = sqlFetchArray($result)) {
+        foreach (\OpenEMR\Services\Insurance\PolicyRecords::eligibilityResults($pid) as $benefit) {
             if ($title) {
                 $title = 0;
                 $showString .= "<div class='col col-sm-12'>\n";
@@ -754,8 +742,7 @@ HTML;
         $partner_id = $subscriber['isa_sender_id'];
         $patient_id = $subscriber['pid'];
 
-        $query = "SELECT id, copay FROM insurance_data WHERE type = 'primary' and pid = ?";
-        $insId = sqlQuery($query, [$patient_id]);
+        $insId = \OpenEMR\Services\Insurance\PolicyRecords::primaryIdAndCopay($patient_id);
         if ($insId !== false) {
             $insurance_id = $insId['id'];
             $copay = $insId['copay'];
