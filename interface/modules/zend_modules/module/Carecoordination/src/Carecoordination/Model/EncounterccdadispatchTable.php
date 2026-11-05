@@ -23,6 +23,9 @@ use Carecoordination\Model\CarecoordinationTable;
 use Documents\Plugin\Documents;
 use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\DateRange;
+use OpenEMR\Common\Dates\InForce;
+use OpenEMR\Common\Dates\SiteClock;
 use OpenEMR\Common\Filesystem\SafeIncludeResolver;
 use OpenEMR\Common\ORDataObject\ContactAddress;
 use OpenEMR\Common\Session\SessionWrapperFactory;
@@ -1556,12 +1559,13 @@ class EncounterccdadispatchTable
         $query = "SELECT l.id, l.title, l.begdate, l.enddate, lo.title AS observation,
             SUBSTRING(lo.codes, LOCATE(':',lo.codes)+1, LENGTH(lo.codes)) AS observation_code,
                         SUBSTRING(l.`diagnosis`,1,LOCATE(':',l.diagnosis)-1) AS code_type_real,
-                        l.reaction, l.diagnosis, l.diagnosis AS code, author.id AS provenance_updated_by, l.modifydate
+                        l.reaction, l.diagnosis, l.diagnosis AS code, author.id AS provenance_updated_by, l.modifydate, l.activity
                         FROM lists AS l
                         LEFT JOIN list_options AS lo ON lo.list_id = ? AND lo.option_id = l.severity_al
                         left join users author ON l.user = author.username
                         WHERE l.type = ? AND l.pid = ?";
         $res = QueryUtils::fetchRecords($query, ['severity_ccda', 'allergy', $pid]);
+        $now = (new SiteClock())->now();
 
         $site_id = $this->session->get('site_id');
         $allergies = "<allergies>";
@@ -1590,7 +1594,8 @@ class EncounterccdadispatchTable
 
                 $active = $status_table = '';
 
-                if ($row['enddate']) {
+                // Resolved once it isn't in force now (withdrawn, or past its end date; a zero end is no end)
+                if (!InForce::issue($row, $now)) {
                     $active = 'completed';
                     $allergy_status = 'completed';
                     $status_table = 'Resolved';
@@ -1625,7 +1630,7 @@ class EncounterccdadispatchTable
                 <outcome>" . xmlEscape(($row['observation'] ? Listener::z_xlt($row['observation']) : "")) . "</outcome>
                 <outcome_code>" . xmlEscape(($row['observation_code'] ?: 0)) . "</outcome_code>
                 <startdate>" . xmlEscape($row['begdate'] ? preg_replace('/-/', '', (string)$row['begdate']) : "00000000") . "</startdate>
-                <enddate>" . xmlEscape($row['enddate'] ? preg_replace('/-/', '', (string)$row['enddate']) : "00000000") . "</enddate>
+                <enddate>" . xmlEscape(InForce::hasEnd($row['enddate']) ? preg_replace('/-/', '', (string)$row['enddate']) : "00000000") . "</enddate>
                 <reaction_text>" . xmlEscape($reaction_text ? Listener::z_xlt($reaction_text) : "") . "</reaction_text>
                 <reaction_code>" . xmlEscape($reaction_code[1] ?? '') . "</reaction_code>
                 <reaction_code_type>" . xmlEscape(str_replace('-', ' ', $reaction_code[0] ?? '') ?: '') . "</reaction_code_type>
@@ -1648,7 +1653,7 @@ class EncounterccdadispatchTable
     public function getMedications($pid): string
     {
         $medications = '';
-        $query = "select l.id, l.date_added, l.start_date, l.drug, l.dosage, l.quantity, l.size, l.substitute, l.drug_info_erx, l.active, SUBSTRING(l3.codes, LOCATE(':',l3.codes)+1, LENGTH(l3.codes)) AS route_code,
+        $query = "select l.id, l.date_added, l.start_date, l.end_date, l.drug, l.dosage, l.quantity, l.size, l.substitute, l.drug_info_erx, l.active, SUBSTRING(l3.codes, LOCATE(':',l3.codes)+1, LENGTH(l3.codes)) AS route_code,
                        l.rxnorm_drugcode, l1.title as unit, l1.codes as unit_code,l2.title as form,SUBSTRING(l2.codes, LOCATE(':',l2.codes)+1, LENGTH(l2.codes)) AS form_code, l3.title as route, l4.title as `interval`,
                        u.title, u.fname, u.lname, u.mname, u.npi, u.street, u.streetb, u.city, u.state, u.zip, u.phonew1, l.note
                        ,u.id AS provider_id, l.date_modified, l.updated_by AS provenance_updated_by
@@ -1660,6 +1665,7 @@ class EncounterccdadispatchTable
                        left join users as u on u.id = l.provider_id
                        where l.patient_id = ? and l.active = 1";
         $res = QueryUtils::fetchRecords($query, ['drug_units', 'drug_form', 'drug_route', 'drug_interval', $pid]);
+        $today = (new SiteClock())->today();
 
         $site_id = $this->session->get('site_id');
         $medications = "<medications>";
@@ -1680,7 +1686,8 @@ class EncounterccdadispatchTable
 
             $str = $unit . " " . Listener::z_xlt($row['route']) . " " . $row['dosage'] . " " . Listener::z_xlt($row['form'] . " " . $row['interval']);
 
-            $active = $row['active'] > 0 ? 'active' : 'completed';
+            // active while in force today; one whose course has ended is completed
+            $active = InForce::prescription($row, $today) ? 'active' : 'completed';
 
             $start_date = '';
             $start_date_formatted = '';
@@ -1748,6 +1755,7 @@ class EncounterccdadispatchTable
     left join list_options as lo on lo.option_id = l.outcome AND lo.list_id = ?
     where l.type = ? and l.pid = ? AND l.outcome != ?"; // patched out /* AND l.id NOT IN(SELECT list_id FROM issue_encounter WHERE pid = ?)*/
         $res = QueryUtils::fetchRecords($query, ['outcome', 'medical_problem', $pid, 1]);
+        $now = (new SiteClock())->now();
 
         $site_id = $this->session->get('site_id');
         $problem_lists .= '<problem_lists>';
@@ -1769,14 +1777,15 @@ class EncounterccdadispatchTable
 
                 $age = $this->getAge($pid, $row['begdate']);
                 $start_date = str_replace('-', '', $row['begdate'] ?? '');
-                $end_date = str_replace('-', '', $row['enddate'] ?? '');
+                // a zero end date is no end
+                $end_date = is_string($row['enddate'] ?? null) && InForce::hasEnd($row['enddate']) ? str_replace('-', '', $row['enddate']) : '';
 
                 $status = $status_table = '';
                 $start_date = $start_date ?: '0';
                 $end_date = $end_date ?: '0';
 
-                //Active - 55561003     Completed - 73425007
-                if ($end_date) {
+                //Active - 55561003     Completed - 73425007: Resolved once it isn't in force now (withdrawn, or past its end)
+                if (!InForce::issue($row, $now)) {
                     $status = 'completed';
                     $status_table = 'Resolved';
                     $status_code = '73425007';
@@ -3781,8 +3790,10 @@ class EncounterccdadispatchTable
     public function getEncounterDate($date): array
     {
         $date_list = [];
-        $query = "select pid, encounter from form_encounter where date between ? and ?";
-        $result = QueryUtils::fetchRecords($query, [$date, $date]);
+        // the visits on that day, whatever their time (BETWEEN the same date twice found only midnight)
+        $onDay = DateRange::between('date', $date, $date);
+        $query = "select pid, encounter from form_encounter where " . $onDay->sql;
+        $result = QueryUtils::fetchRecords($query, $onDay->binds);
 
         $count = 0;
         foreach ($result as $row) {
