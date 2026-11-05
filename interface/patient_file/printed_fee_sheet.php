@@ -482,11 +482,11 @@ foreach ($pid_list as $pid) {
             if (empty(OEGlobalsBag::getInstance()->get('ippf_specific'))) {
                 $html .= xlt('Insurance') . ":";
                 if ($form_fill) {
-                    foreach (['primary', 'secondary', 'tertiary'] as $instype) {
-                        $query = "SELECT * FROM insurance_data WHERE " .
-                                "pid = ? AND type = ? " .
-                                "ORDER BY date DESC LIMIT 1";
-                        $row = sqlQuery($query, [$pid, $instype]);
+                    // Twin (insurance-reference): the policies in force on the appointment's date of
+                    // service (else today); master printed each level's latest-starting row, ended or not.
+                    $printDay = \OpenEMR\Services\Insurance\CoverageDay::forVisit($appointment[0]['pc_eventDate'] ?? null, \OpenEMR\Services\Insurance\CoverageDay::today());
+                    foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows((int)$pid, $printDay) as $row) {
+                        $instype = $row['type'];
                         if (!empty($row['provider'])) {
                             $icobj = new InsuranceCompany($row['provider']);
                             $adobj = $icobj->get_address();
