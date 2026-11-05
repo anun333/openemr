@@ -431,7 +431,16 @@ class EDI270
         return $out;
     }
 
-    public static function requestEligibleTransaction($pid = 0, $eFlag = false)
+    /**
+     * Twin (insurance-reference): the rows a real-time 270 is built from: the
+     * patient, the provider and facility, and the primary in force today (a
+     * real-time check has no appointment). With no primary in force today it
+     * keeps master's choice, the latest-starting primary, ended or not yet
+     * begun, so the payer is still asked (and usually answers "inactive").
+     *
+     * @return list<array<mixed>>
+     */
+    public static function realTimeRows(int $pid): array
     {
         $query = "SELECT
             d.facility_id,
@@ -444,23 +453,46 @@ class EDI270
             p.pid,
             p.pubpid,
             p.providerID,
+            i.subscriber_ss,
+            i.policy_number,
+            i.provider as payer_id,
+            i.subscriber_relationship,
+            i.subscriber_lname,
+            i.subscriber_fname,
+            i.subscriber_mname,
+            DATE_FORMAT(i.subscriber_DOB, '%Y%m%d') as subscriber_dob,
+            i.policy_number,
+            i.subscriber_sex,
+            DATE_FORMAT(i.date, '%Y%m%d') as date,
             d.lname as provider_lname,
             d.fname as provider_fname,
             d.npi as provider_npi,
             d.upin as provider_pin,
             f.federal_ein as federal_ein,
             f.facility_npi as facility_npi,
-            f.name as facility_name
+            f.name as facility_name,
+            c.cms_id as cms_id,
+            c.eligibility_id as eligibility_id,
+            c.x12_default_eligibility_id as partner,
+            c.name as payer_name
         FROM patient_data AS p
         LEFT JOIN users AS d on (p.providerID = d.id)
         LEFT JOIN facility AS f on (f.id = d.facility_id)
+        LEFT JOIN insurance_data AS i ON (i.id =(SELECT id FROM insurance_data AS i WHERE pid = p.pid AND type = 'primary' ORDER BY date DESC LIMIT 1))
+        LEFT JOIN insurance_companies as c ON (c.id = i.provider)
         WHERE p.pid = ?";
         $res = sqlStatement($query, [$pid]);
         $resArray = [];
         while ($row = sqlFetchArray($res)) {
-            // Twin (insurance-reference): the primary in force today (a real-time check has no appointment).
-            $resArray[] = array_merge($row, self::coverageColumns(is_numeric($row['pid']) ? (int)$row['pid'] : 0, self::eligibilityDay(null, null)));
+            $inForce = self::coverageColumns($pid, self::eligibilityDay(null, null));
+            $resArray[] = $inForce['payer_id'] === null ? $row : array_merge($row, $inForce);
         }
+        return $resArray;
+    }
+
+    public static function requestEligibleTransaction($pid = 0, $eFlag = false)
+    {
+        $resArray = self::realTimeRows(is_numeric($pid) ? (int)$pid : 0);
         $details = self::requestRealTimeEligible($resArray, '', "~", ':', true);
         if ($details === false) {
             $details = "Error: Nothing returned from X12 Partner.";
