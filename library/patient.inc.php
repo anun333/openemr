@@ -1475,12 +1475,12 @@ function dateToDB($date): string
  * EmployerService. Each row is every insurance_data column of a policy
  * InsuranceService::getEffectiveInsuranceRows() returns.
  *
- * It chooses by the service's rule (EffectiveInsuranceRule), so the
- * procedural screens and the service agree.
- *
- * Like the query it replaced, the list stops at the first level with nothing
- * in force, so a row's position is its level: a current secondary behind an
- * ended primary gives no policies.
+ * The service's own getEffectiveInsurances() shares this name and answers the
+ * same question by the same rule (EffectiveInsuranceRule); it returns the
+ * policies as EffectiveInsurance values, not rows, and every level in force,
+ * where this wrapper stops at the first level with nothing in force, like
+ * the query it replaced, so a row's position is its level: a current
+ * secondary behind an ended primary gives no policies here.
  *
  * Where it differs from the query it replaced:
  * - a 0000-00-00 end is open, where the query read it as ended;

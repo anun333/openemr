@@ -502,19 +502,37 @@ class InsuranceService extends BaseService
     }
 
     /**
-     * The policies in force for a patient on a day, at most one per level and
-     * primary first, by the rule in EffectiveInsuranceRule: the claim's rule
-     * (Claim::loadPayerInfo()) with the three differences its docblock lists.
-     * A level with nothing in force is left out and the others are still
-     * returned, so a current secondary behind an ended primary comes back on
-     * its own. Each policy comes with its insurance_data row and its company's
-     * name; an inactive company's name comes back too, since inactive keeps a
-     * company off the pick lists, not off the policies already on file.
+     * The policies in force for a patient on a day: at most one per level,
+     * primary first, by the rule in EffectiveInsuranceRule. That is the
+     * claim's rule (Claim::loadPayerInfo()) with three differences, which its
+     * docblock lists. A level with nothing in force is left out and the others
+     * are still returned, so a current secondary behind an ended primary comes
+     * back on its own.
      *
-     * getEffectiveInsurances() in library/patient.inc.php is a wrapper over
-     * this method and returns the rows.
+     * getEffectiveInsurances() in library/patient.inc.php shares this name: it
+     * is a wrapper over getEffectiveInsuranceRows(), the same choice returned
+     * as insurance_data rows instead of these values.
      *
-     * @param DateTimeImmutable $day the day asked about; its time is ignored
+     * @param DateTimeImmutable $day the day asked about (date of service, order or document); its time is ignored
+     * @return list<EffectiveInsurance>
+     */
+    public function getEffectiveInsurances(int $pid, DateTimeImmutable $day): array
+    {
+        $rows = QueryUtils::fetchRecords(
+            "SELECT `id`, `uuid`, `type`, `provider`, `date`, `date_end` FROM `insurance_data` WHERE `pid` = ?",
+            [$pid]
+        );
+        return EffectiveInsuranceRule::choose($rows, $day);
+    }
+
+    /**
+     * The policies in force on a day, as getEffectiveInsurances() chooses them
+     * and in its order, each with its insurance_data row and its company's
+     * name: for callers that show or send the plan, the policy number or the
+     * subscriber (the lab IN1 and requisitions, the claim, the 270). An
+     * inactive company's name comes back too: inactive keeps a company off the
+     * pick lists, not off the policies already on file.
+     *
      * @return list<EffectiveInsuranceRow>
      */
     public function getEffectiveInsuranceRows(int $pid, DateTimeImmutable $day): array
