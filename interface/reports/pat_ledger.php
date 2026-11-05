@@ -206,10 +206,11 @@ function PrintCreditDetail($detail, $pat, $unassigned = false, $effectiveInsuran
             // position payer_type - 1, which held only while getEffectiveInsurances() stopped at the first
             // level with nothing in force.
             $payerId = null;
-            $paymentLevel = [1 => 'primary', 2 => 'secondary', 3 => 'tertiary'][(int)$pmt['payer_type']] ?? '';
-            foreach ($effectiveInsurances as $effectiveInsurance) {
-                if (($effectiveInsurance['type'] ?? '') === $paymentLevel) {
-                    $payerId = $effectiveInsurance['provider'];
+            $paymentType = $pmt['payer_type'];
+            $paymentLevel = [1 => 'primary', 2 => 'secondary', 3 => 'tertiary'][is_numeric($paymentType) ? (int)$paymentType : 0] ?? '';
+            foreach (is_array($effectiveInsurances) ? $effectiveInsurances : [] as $effectiveInsurance) {
+                if (is_array($effectiveInsurance) && ($effectiveInsurance['type'] ?? '') === $paymentLevel) {
+                    $payerId = $effectiveInsurance['provider'] ?? null;
                 }
             }
             $payer = sqlQuery("SELECT `name` FROM `insurance_companies` WHERE `id` = ?", [$payerId])['name'];
