@@ -23,6 +23,7 @@ use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\BC\ServiceContainer;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Events\Services\ServiceSaveEvent;
+use OpenEMR\Services\Insurance\CoverageDay;
 use OpenEMR\Services\Insurance\CoverageSegment;
 use OpenEMR\Services\Insurance\EffectiveInsurance;
 use OpenEMR\Services\Insurance\EffectiveInsuranceRow;
@@ -105,10 +106,12 @@ class InsuranceService extends BaseService
 
         $whereClause = FhirSearchWhereClauseBuilder::build($search, $isAndCondition);
 
+        // Twin (insurance-reference): the policy in force today first, as the coverage
+        // service decides it (both ends inclusive, a blank or zero end open), then the
+        // latest start. Master put any open or future end first, so next year's card
+        // led the list the policy editor and the demographics card open on.
         $orderClause = " ORDER BY `patient_data_pid` ASC,`type` ASC"
-            // sort by 1 first then 0
-        . ", (`date_end` is null or `date_end` > NOW()) DESC"
-        . ", (`date_end` IS NOT NULL AND `date_end` > NOW()) DESC"
+        . ", ((`date` IS NULL OR `date` <= CURDATE()) AND (`date_end` IS NULL OR `date_end` = '0000-00-00' OR `date_end` >= CURDATE())) DESC"
         . ", `date` DESC, `date_end` DESC, `policy_number` ASC";
 
         $sql .= $whereClause->getFragment() . $orderClause;
@@ -487,9 +490,23 @@ class InsuranceService extends BaseService
             }
             $result[$insurancePolicy['type']][] = $insurancePolicy;
         }
+        // Twin (insurance-reference): "current" is the policy the coverage service
+        // has in force today at its level; the others keep search()'s order. A
+        // level with nothing in force keeps search()'s first row, as before.
+        $inForce = [];
+        $today = (new CoverageDay(ServiceContainer::getClock()))->today();
+        foreach ($this->getEffectiveInsurances(is_numeric($pid) ? (int)$pid : 0, $today) as $policy) {
+            $inForce[$policy->level->value] = $policy->id;
+        }
         $organizedResults = [];
         foreach ($result as $key => $policies) {
             if (count($policies) > 0) {
+                foreach ($policies as $i => $policy) {
+                    if (isset($inForce[$key]) && (int)($policy['id'] ?? 0) === $inForce[$key]) {
+                        array_unshift($policies, ...array_splice($policies, $i, 1));
+                        break;
+                    }
+                }
                 reset($policies);
                 $current = current($policies);
                 $history = array_splice($policies, 1);
