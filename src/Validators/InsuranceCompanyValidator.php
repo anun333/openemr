@@ -62,7 +62,7 @@ class InsuranceCompanyValidator extends BaseValidator
                     }
                 );
                 // additional uuid validation
-                $context->required("uuid", "Insurance UUID")->callback(fn($value) => $this->validateId("uuid", "insurance_companies", $value, true))->uuid();
+                $context->required("uuid", "Insurance UUID")->callback(fn($value) => $this->validateId("uuid", \OpenEMR\Services\Insurance\InsuranceTables::PAYERS, $value, true))->uuid();
             }
         );
     }

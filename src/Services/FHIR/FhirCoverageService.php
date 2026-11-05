@@ -724,10 +724,7 @@ class FhirCoverageService extends FhirServiceBase implements IPatientCompartment
         if (!UuidRegistry::isValidStringUUID($fhirResourceId)) {
             return null;
         }
-        $row = QueryUtils::querySingleRow(
-            "SELECT * FROM insurance_data WHERE uuid = ?",
-            [UuidRegistry::uuidToBytes($fhirResourceId)]
-        );
+        $row = \OpenEMR\Services\Insurance\PolicyRecords::byUuid(UuidRegistry::uuidToBytes($fhirResourceId));
         if (!is_array($row)) {
             return null;
         }
@@ -810,11 +807,7 @@ class FhirCoverageService extends FhirServiceBase implements IPatientCompartment
         $insurerUuid = $record['insureruuid'] ?? null;
         if (is_string($insurerUuid) && $insurerUuid !== '') {
             $insurerUuidBytes = UuidRegistry::uuidToBytes($insurerUuid);
-            $providerId = QueryUtils::fetchSingleValue(
-                "SELECT id FROM insurance_companies WHERE uuid = ?",
-                'id',
-                [$insurerUuidBytes]
-            );
+            $providerId = \OpenEMR\Services\InsuranceCompanyService::idByUuid($insurerUuidBytes);
             if (!is_numeric($providerId)) {
                 $result = new ProcessingResult();
                 $result->setValidationMessages([

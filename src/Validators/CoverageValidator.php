@@ -3,7 +3,6 @@
 namespace OpenEMR\Validators;
 
 use OpenEMR\Billing\InsurancePolicyTypes;
-use OpenEMR\Common\Database\QueryUtils;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Services\PatientService;
@@ -187,13 +186,12 @@ class CoverageValidator extends BaseValidator
                     // need to check
                         // TODO: @adunsulag need to move all these queries into the InsuranceService...
                         if (!empty($values['pid']) && !empty($values['type']) && !empty($value)) {
-                            $sqlCheck = "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date = ?";
-                            $binds = [$values['pid'], $values['type'], $value];
-                            if (!empty($values['uuid'])) {
-                                $sqlCheck .= " AND uuid != ?";
-                                $binds[] = UuidRegistry::uuidToBytes($values['uuid']);
-                            }
-                            $duplicatePolicyCount = QueryUtils::fetchSingleValue($sqlCheck, 'cnt', $binds);
+                            $duplicatePolicyCount = \OpenEMR\Services\Insurance\PolicyChecks::countStartingAt(
+                                $values['pid'],
+                                $values['type'],
+                                $value,
+                                !empty($values['uuid']) ? UuidRegistry::uuidToBytes($values['uuid']) : null
+                            );
                             if ($duplicatePolicyCount != null && $duplicatePolicyCount > 0) {
                                 throw new InvalidValueException("A policy for this type with the same effective date already exists for this patient", "Record::DUPLICATE_RECORD");
                             }
@@ -203,15 +201,14 @@ class CoverageValidator extends BaseValidator
                         // so we will do it on the date column
                         if (!empty($values['pid']) && !empty($values['type'])) {
                             if (empty($value)) {
-                                $sqlCheck = "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date_end IS NULL";
-                                $binds = [$values['pid'], $values['type']];
-                                if (!empty($values['uuid'])) {
-                                    $sqlCheck .= " AND uuid != ?";
-                                    $binds[] = UuidRegistry::uuidToBytes($values['uuid']);
-                                }
+
                                 // check to make sure there are no other policies for this type with an empty end date as we can
                                 // only have one current policy for a given type
-                                $currentPolicyCount = QueryUtils::fetchSingleValue($sqlCheck, 'cnt', $binds);
+                                $currentPolicyCount = \OpenEMR\Services\Insurance\PolicyChecks::countOpenAtLevel(
+                                    $values['pid'],
+                                    $values['type'],
+                                    !empty($values['uuid']) ? UuidRegistry::uuidToBytes($values['uuid']) : null
+                                );
                                 if ($currentPolicyCount != null && $currentPolicyCount > 0) {
                                     throw new InvalidValueException("A current policy (no end date) already exists for this patient and type.", "Record::DUPLICATE_CURRENT_POLICY");
                                 }
@@ -251,7 +248,7 @@ class CoverageValidator extends BaseValidator
                     }
                 );
                 // additional uuid validation
-                $context->required("uuid", "Coverage UUID")->callback(fn($value) => $this->validateId("uuid", "insurance_data", $value, true))->uuid();
+                $context->required("uuid", "Coverage UUID")->callback(fn($value) => $this->validateId("uuid", \OpenEMR\Services\Insurance\InsuranceTables::POLICIES, $value, true))->uuid();
             }
         );
 
@@ -268,14 +265,14 @@ class CoverageValidator extends BaseValidator
                     }
                 );
                 // an update names the stored policy; an insert has no uuid yet
-                $context->optional("uuid", "Coverage UUID")->callback(fn($value) => $this->validateId("uuid", "insurance_data", $value, true))->uuid();
+                $context->optional("uuid", "Coverage UUID")->callback(fn($value) => $this->validateId("uuid", \OpenEMR\Services\Insurance\InsuranceTables::POLICIES, $value, true))->uuid();
             }
         );
 
         $this->validator->context(
             self::DATABASE_SWAP_CONTEXT,
             function (Validator $context): void {
-                $context->required("uuid", "Coverage UUID")->callback(fn($value) => $this->validateId("uuid", "insurance_data", $value, true))->uuid();
+                $context->required("uuid", "Coverage UUID")->callback(fn($value) => $this->validateId("uuid", \OpenEMR\Services\Insurance\InsuranceTables::POLICIES, $value, true))->uuid();
                 $context->required("pid", "Patient ID")->numeric();
                 $context->required("type", "Coverage Type")->inArray(['primary', 'secondary', 'tertiary'])
                     ->callback(function ($value, $values) {
@@ -297,34 +294,23 @@ class CoverageValidator extends BaseValidator
                         // hit the database to grab the most recent policy for this type
                         // grab the uuid we are checking
                         $uuidBytes = UuidRegistry::uuidToBytes($values['uuid']);
-                        $srcData = QueryUtils::fetchRecords("SELECT `date`,`type` FROM insurance_data WHERE uuid = ?", [$uuidBytes]);
+                        $srcData = \OpenEMR\Services\Insurance\PolicyChecks::startAndLevelByUuid($uuidBytes);
                         if (empty($srcData)) {
                             throw new InvalidValueException("Invalid coverage uuid", "Record::INVALID_RECORD_UUID");
                         }
                         $srcDate = $srcData[0]['date'];
-                        $targetDate = QueryUtils::fetchSingleValue(
-                            "SELECT `date` FROM insurance_data WHERE pid = ? AND type = ? ORDER BY date DESC LIMIT 1",
-                            'date',
-                            [$values['pid'], $values['type']]
-                        );
+                        $targetDate = \OpenEMR\Services\Insurance\PolicyChecks::latestStartAtLevel($values['pid'], $values['type']);
                         if (empty($srcDate)) {
                             if (!empty($targetDate)) {
-                                $srcTypeCanReceiveTarget = QueryUtils::fetchSingleValue(
-                                    "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date IS NOT NULL AND date = ?",
-                                    'cnt',
-                                    [$values['pid'], $srcData[0]['type'], $targetDate] // Twin (insurance-reference): master read ['type'] off the list, binding NULL
-                                );
+                                // Twin (insurance-reference): master read ['type'] off the list, binding NULL
+                                $srcTypeCanReceiveTarget = \OpenEMR\Services\Insurance\PolicyChecks::countDatedStartingAt($values['pid'], $srcData[0]['type'], $targetDate);
                                 if ($srcTypeCanReceiveTarget > 0) {
                                     throw new InvalidValueException("Source coverage type already has a policy with an effective date that conflicts with the target policy effective date", "Record::INVALID_SOURCE_POLICY_DATE");
                                 }
                             }
                         } else {
                             if (!(empty($targetDate) || $targetDate == $srcDate)) {
-                                $targetTypeCanReceiveSrc = QueryUtils::fetchSingleValue(
-                                    "SELECT COUNT(*) AS cnt FROM insurance_data WHERE pid = ? AND type = ? AND date IS NOT NULL AND date = ?",
-                                    'cnt',
-                                    [$values['pid'], $values['type'], $srcDate]
-                                );
+                                $targetTypeCanReceiveSrc = \OpenEMR\Services\Insurance\PolicyChecks::countDatedStartingAt($values['pid'], $values['type'], $srcDate);
                                 if ($targetTypeCanReceiveSrc > 0) {
                                     throw new InvalidValueException("Target coverage type already has a policy with an effective date that conflicts with the source policy effective date", "Record::INVALID_TARGET_POLICY_DATE");
                                 }
