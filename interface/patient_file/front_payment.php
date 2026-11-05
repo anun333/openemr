@@ -89,11 +89,9 @@ $today = date('Y-m-d', $now);
 $timestamp = date('Y-m-d H:i:s', $now);
 
 $patdata = sqlQuery("SELECT " .
-    "p.fname, p.mname, p.lname, p.pubpid,p.pid, i.copay " .
-    "FROM patient_data AS p " .
-    "LEFT OUTER JOIN insurance_data AS i ON " .
-    "i.pid = p.pid AND i.type = 'primary' " .
-    "WHERE p.pid = ? ORDER BY i.date DESC LIMIT 1", [$pid]);
+    "p.fname, p.mname, p.lname, p.pubpid,p.pid " .
+    // Twin (insurance-reference): master joined the latest-starting primary for i.copay, which nothing here reads.
+    "FROM patient_data AS p WHERE p.pid = ?", [$pid]);
 
 $invoice_refno = BillingUtilities::updateInvoiceRefNumber();
 
