@@ -127,7 +127,8 @@ class FeeSheet
         // Twin (insurance-reference): billing.payer_id is the primary in force on the visit
         // date (master: getInsuranceData(), the latest-starting primary, ended or not).
         $this->payer_id = null;
-        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances((int)$this->pid, \OpenEMR\Services\Insurance\CoverageDay::forVisit($this->visit_date, \OpenEMR\Services\Insurance\CoverageDay::today())) as $policy) {
+        $visitDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($this->visit_date);
+        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(is_numeric($this->pid) ? (int)$this->pid : 0, $visitDay) as $policy) {
             if ($policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary) {
                 $this->payer_id = $policy->companyId;
             }

@@ -386,7 +386,7 @@ class EDI270
      */
     public static function eligibilityDay(?string $appointmentYmd, mixed $X12info): \DateTimeImmutable
     {
-        $today = \OpenEMR\Services\Insurance\CoverageDay::today();
+        $today = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->today();
         if (!is_array($X12info) || ($X12info['x12_dtp03'] ?? '') !== 'A' || $appointmentYmd === null) {
             return $today;
         }
@@ -406,10 +406,11 @@ class EDI270
         $out = array_fill_keys(['subscriber_ss', 'policy_number', 'payer_id', 'subscriber_relationship', 'subscriber_lname',
             'subscriber_fname', 'subscriber_mname', 'subscriber_dob', 'subscriber_sex', 'date', 'cms_id', 'eligibility_id',
             'partner', 'payer_name'], null);
-        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows($pid, $day) as $i) {
-            if ($i['type'] !== 'primary') {
+        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows($pid, $day) as $effective) {
+            if ($effective->policy->level !== \OpenEMR\Services\Insurance\InsuranceLevel::Primary) {
                 continue;
             }
+            $i = $effective->columns;
             $c = QueryUtils::querySingleRow(
                 'SELECT cms_id, eligibility_id, x12_default_eligibility_id AS partner, name AS payer_name FROM insurance_companies WHERE id = ?',
                 [$i['provider']]
