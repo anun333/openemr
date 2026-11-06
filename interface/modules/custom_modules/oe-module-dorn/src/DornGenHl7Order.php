@@ -86,7 +86,7 @@ class DornGenHl7Order extends GenHl7OrderBase
         $labDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
             $collected,
             $ordered
-        )->format('Y-m-d');
+        )?->format('Y-m-d') ?? '';  // neither date readable: no day, and no payers
         $payers = $this->loadPayerInfo($porow['pid'], $labDay);
         $setid = 0;
         if ($bill_type == 'T') {

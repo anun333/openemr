@@ -204,10 +204,12 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
         $encounter_date = $row['date'];
         // Twin (insurance-reference): the primary in force on the visit date, through the coverage
         // service (master: the latest-starting primary, ended or not).
-        $primaryRow = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
+        // A visit date it can't read counts under no insurance (CoverageDay has no day for it).
+        $visitDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($encounter_date);
+        $primaryRow = $visitDay === null ? null : ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
             is_numeric($patient_id) ? (int)$patient_id : 0,
-            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($encounter_date)
-        )[0] ?? null;
+            $visitDay
+        )[0] ?? null);
         $irow = $primaryRow?->policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary ? ['name' => $primaryRow->companyName] : [];
         $plan = (!empty($irow['name'])) ? $irow['name'] : '-- No Insurance --';
         $insarr[$plan]['visits'] ??= 0;

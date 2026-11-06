@@ -266,10 +266,15 @@ class SLEOB
         if ($level === null) {
             return 0;
         }
+        // A date of service it can't read gives no payer (CoverageDay has no day for it).
+        $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit($date_of_service);
+        if ($day === null) {
+            return 0;
+        }
         $policy = (new InsuranceService())->getEffectiveInsuranceAt(
             is_numeric($patient_id) ? (int)$patient_id : 0,
             $level,
-            (new CoverageDay(ServiceContainer::getClock()))->forVisit($date_of_service)
+            $day
         );
         return $policy === null ? 0 : $policy->companyId;
     }

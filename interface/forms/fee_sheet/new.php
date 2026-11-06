@@ -1618,10 +1618,12 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                                             $newsel  = $arrcode[2];
                                             if ($newtype == 'COPAY') {
                                                 // Twin (insurance-reference): the copay of the primary in force on the visit date.
-                                                $primaryNow = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
+                                                // A visit date it can't read gives no copay (CoverageDay has no day for it).
+                                                $visitDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($fs->visit_date);
+                                                $primaryNow = $visitDay === null ? null : ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
                                                     is_numeric($fs->pid) ? (int)$fs->pid : 0,
-                                                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($fs->visit_date)
-                                                )[0] ?? null;
+                                                    $visitDay
+                                                )[0] ?? null);
                                                 $visitCopay = $primaryNow?->policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary
                                                     ? ($primaryNow->columns['copay'] ?? 0) : 0;
                                                 $code = formatMoneyNumber($visitCopay);

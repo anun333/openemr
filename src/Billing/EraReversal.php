@@ -117,7 +117,8 @@ final readonly class EraReversal
         $providers = [];
         $levels = [InsuranceLevel::Primary->value => 1, InsuranceLevel::Secondary->value => 2, InsuranceLevel::Tertiary->value => 3];
         $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit($dateOfService);
-        foreach ((new InsuranceService())->getEffectiveInsurances($pid, $day) as $policy) {
+        // A date of service it can't read gives no payers (CoverageDay has no day for it).
+        foreach ($day === null ? [] : (new InsuranceService())->getEffectiveInsurances($pid, $day) as $policy) {
             $providers[$levels[$policy->level->value]] = (string) $policy->companyId;
         }
         return $providers;
