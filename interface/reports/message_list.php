@@ -214,8 +214,9 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
     } // end not export
     $sqlBindArray = [];
 
-    $where = "pn.date >= ? AND pn.date <= ?";
-    array_push($sqlBindArray, $form_from_date . " 00:00:00", $form_to_date . " 23:59:59");
+    $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('pn.date', $form_from_date, $form_to_date);
+    $where = $onDays->sql;
+    array_push($sqlBindArray, ...$onDays->binds);
 
     if (!empty($form_patient_id)) {
         $where .= " AND p.pubpid = ?";

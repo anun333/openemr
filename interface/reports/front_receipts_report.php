@@ -230,7 +230,8 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_orderby'])) {
         $total1_by_method = [];
         $total2_by_method = [];
 
-        $inputArray = [$from_date . ' 00:00:00', $to_date . ' 23:59:59'];
+        $paidOn = \OpenEMR\Common\Dates\DateRange::wholeDays('r.dtime', $from_date, $to_date);
+        $inputArray = $paidOn->binds;
         $query = "SELECT r.pid, r.dtime, " .
         "SUM(r.amount1) AS amount1, " .
         "SUM(r.amount2) AS amount2, " .
@@ -243,8 +244,7 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_orderby'])) {
         "LEFT OUTER JOIN patient_data AS p ON " .
         "p.pid = r.pid " .
         "WHERE " .
-        "r.dtime >= ? AND " .
-        "r.dtime <= ? AND ";
+        $paidOn->sql . " AND ";
         if ($_POST['form_facility'] != "") {
             $inputArray[] = $_POST['form_facility'];
             $query .= "fe.facility_id = ? AND ";

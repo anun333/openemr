@@ -162,14 +162,14 @@ if (!empty($_POST['form_refresh'])) {
     // "LEFT OUTER JOIN users AS u ON BINARY u.username = BINARY f.user WHERE ";
     "LEFT OUTER JOIN users AS u ON u.id = fe.provider_id WHERE ";
     array_push($sqlBindArray, '?', '?');
+    // the whole days from the first through the last (one day when there is no last)
+    $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $form_from_date, $form_to_date ?: $form_from_date);
     if ($form_to_date) {
-        // $query .= "LEFT(fe.date, 10) >= '$form_from_date' AND LEFT(fe.date, 10) <= '$form_to_date' ";
-        $query .= "fe.date >= ? AND fe.date <= ? ";
-        array_push($sqlBindArray, $form_from_date . ' 00:00:00', $form_to_date . ' 23:59:59');
+        $query .= $onDays->sql . " ";
+        array_push($sqlBindArray, ...$onDays->binds);
     } else {
-       // $query .= "LEFT(fe.date, 10) = '$form_from_date' ";
-        $query .= "fe.date >= ? AND fe.date <= ? ";
-        array_push($sqlBindArray, $form_from_date . ' 00:00:00', $form_from_date . ' 23:59:59');
+        $query .= $onDays->sql . " ";
+        array_push($sqlBindArray, ...$onDays->binds);
     }
 
     if ($form_facility !== '') {

@@ -533,8 +533,8 @@ if (!empty($_POST['form_csvexport'])) {
 }
 
 if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
-    $from_date = $form_from_date . ' 00:00:00';
-    $to_date = $form_to_date . ' 23:59:59';
+    // the whole days from the first through the last
+    $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $form_from_date, $form_to_date);
     $category = "";
     $catleft = "";
     $cattotal = 0;
@@ -555,8 +555,8 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
     "LEFT JOIN codes AS c ON c.code_type = ct.ct_id AND c.code = b.code AND c.modifier = b.modifier " .
     "LEFT JOIN list_options AS lo ON lo.list_id = 'superbill' AND lo.option_id = c.superbill AND lo.activity = 1 " .
     "WHERE b.code_type != 'COPAY' AND b.activity = 1 AND b.fee != 0 AND " .
-    "fe.date >= ? AND fe.date <= ?";
-    array_push($sqlBindArray, $from_date, $to_date);
+    $onDays->sql;
+    array_push($sqlBindArray, ...$onDays->binds);
     // If a facility was specified.
     if ($form_facility) {
         $query .= " AND fe.facility_id = ?";
@@ -592,9 +592,9 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_csvexport'])) {
     "JOIN drugs AS d ON d.drug_id = s.drug_id " .
     "JOIN form_encounter AS fe ON " .
     "fe.pid = s.pid AND fe.encounter = s.encounter AND " .
-    "fe.date >= ? AND fe.date <= ? " .
+    $onDays->sql . " " .
     "WHERE s.fee != 0";
-    array_push($sqlBindArray, $from_date, $to_date);
+    array_push($sqlBindArray, ...$onDays->binds);
     // If a facility was specified.
     if ($form_facility) {
         $query .= " AND fe.facility_id = ?";

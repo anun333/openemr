@@ -547,9 +547,10 @@ if (!empty($_POST['form_refresh'])) {
             "fe.date, fe.facility_id, fe.invoice_refno, fe.provider_id " .
             "FROM billing AS b " .
             "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
-            "WHERE b.code_type = 'COPAY' AND b.activity = 1 AND b.fee != 0 AND " .
-            "fe.date >= ? AND fe.date <= ?";
-            array_push($sqlBindArray, $form_from_date . ' 00:00:00', $form_to_date . ' 23:59:59');
+            "WHERE b.code_type = 'COPAY' AND b.activity = 1 AND b.fee != 0 AND ";
+            $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $form_from_date, $form_to_date);
+            $query .= $onDays->sql;
+            array_push($sqlBindArray, ...$onDays->binds);
             // If a facility was specified.
             if ($form_facility) {
                 $query .= " AND fe.facility_id = ?";
@@ -600,14 +601,16 @@ if (!empty($_POST['form_refresh'])) {
           "WHERE a.deleted IS NULL AND (a.pay_amount != 0 OR a.adj_amount != 0)";
         //
         if ($form_use_edate) {
-            $query .= " AND fe.date >= ? AND fe.date <= ?";
-            array_push($sqlBindArray, $form_from_date . ' 00:00:00', $form_to_date . ' 23:59:59');
+            $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $form_from_date, $form_to_date);
+            $query .= " AND " . $onDays->sql;
+            array_push($sqlBindArray, ...$onDays->binds);
         } else {
-            $query .= " AND ( ( s.deposit_date IS NOT NULL AND " .
-            "s.deposit_date >= ? AND s.deposit_date <= ? ) OR " .
-            "( s.deposit_date IS NULL AND a.post_time >= ? AND " .
-            "a.post_time <= ? ) )";
-            array_push($sqlBindArray, $form_from_date, $form_to_date, $form_from_date . ' 00:00:00', $form_to_date . ' 23:59:59');
+            // deposited on one of the days (a DATE: its days are whole as they are), or posted on one when not deposited
+            $depositedOn = \OpenEMR\Common\Dates\DateRange::wholeDays('s.deposit_date', $form_from_date, $form_to_date);
+            $postedOn = \OpenEMR\Common\Dates\DateRange::wholeDays('a.post_time', $form_from_date, $form_to_date);
+            $query .= " AND ( ( s.deposit_date IS NOT NULL AND " . $depositedOn->sql . " ) OR " .
+            "( s.deposit_date IS NULL AND " . $postedOn->sql . " ) )";
+            array_push($sqlBindArray, ...$depositedOn->binds, ...$postedOn->binds);
         }
 
         // If a procedure code was specified.

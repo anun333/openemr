@@ -299,9 +299,10 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     "FROM billing AS b " .
     "JOIN codes AS c ON c.code_type = '12' AND c.code = b.code AND c.modifier = b.modifier AND c.cyp_factor > 0 " .
     "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
-    "WHERE b.code_type = 'MA' AND b.activity = 1 AND " .
-    "fe.date >= ? AND fe.date <= ?";
-    array_push($sqlBindArray, $from_date . ' 00:00:00', $to_date . ' 23:59:59');
+    "WHERE b.code_type = 'MA' AND b.activity = 1 AND ";
+    $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $from_date, $to_date);
+    $query .= $onDays->sql;
+    array_push($sqlBindArray, ...$onDays->binds);
 
     // If a facility was specified.
     if ($form_facility) {
@@ -331,10 +332,10 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     "FROM drug_sales AS s " .
     "JOIN drugs AS d ON d.drug_id = s.drug_id AND d.cyp_factor > 0 " .
     "JOIN form_encounter AS fe ON " .
-    "fe.pid = s.pid AND fe.encounter = s.encounter AND " .
-    "fe.date >= ? AND fe.date <= ? " .
-    "WHERE s.fee != 0";
-    array_push($sqlBindArray, $from_date . ' 00:00:00', $to_date . ' 23:59:59');
+    "fe.pid = s.pid AND fe.encounter = s.encounter AND ";
+    $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $from_date, $to_date);
+    $query .= $onDays->sql . " WHERE s.fee != 0";
+    array_push($sqlBindArray, ...$onDays->binds);
 
     // If a facility was specified.
     if ($form_facility) {

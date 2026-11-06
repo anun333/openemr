@@ -412,9 +412,10 @@ $form_facility   = $_POST['form_facility'] ?? null;
                             "fe.date, fe.id AS trans_id, fe.provider_id AS docid, fe.invoice_refno " .
                             "FROM billing AS b " .
                             "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
-                            "WHERE b.code_type = 'COPAY' AND b.activity = 1 AND " .
-                            "fe.date >= ? AND fe.date <= ?";
-                            array_push($sqlBindArray, $form_from_date . " 00:00:00", $form_to_date . " 23:59:59");
+                            "WHERE b.code_type = 'COPAY' AND b.activity = 1 AND ";
+                            $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $form_from_date, $form_to_date);
+                            $query .= $onDays->sql;
+                            array_push($sqlBindArray, ...$onDays->binds);
                             // If a facility was specified.
                             if ($form_facility) {
                                 $query .= " AND fe.facility_id = ?";
@@ -510,11 +511,13 @@ $form_facility   = $_POST['form_facility'] ?? null;
                         "LEFT OUTER JOIN billing AS b ON b.pid = a.pid AND b.encounter = a.encounter AND " .
                         "b.code = a.code AND b.modifier = a.modifier AND b.activity = 1 AND " .
                         "b.code_type != 'COPAY' AND b.code_type != 'TAX' " .
-                        "WHERE a.deleted IS NULL AND a.pay_amount != 0 AND ( " .
-                        "a.post_time >= ? AND a.post_time <= ? " .
-                        "OR fe.date >= ? AND fe.date <= ? " .
-                        "OR s.deposit_date >= ? AND s.deposit_date <= ? )";
-                        array_push($sqlBindArray, $form_from_date . " 00:00:00", $form_to_date . " 23:59:59", $form_from_date . " 00:00:00", $form_to_date . " 23:59:59", $form_from_date, $form_to_date);
+                        "WHERE a.deleted IS NULL AND a.pay_amount != 0 AND ( ";
+                        // posted, seen or deposited on one of the days (deposit_date is a DATE: its days are whole as they are)
+                        $postedOn = \OpenEMR\Common\Dates\DateRange::wholeDays('a.post_time', $form_from_date, $form_to_date);
+                        $seenOn = \OpenEMR\Common\Dates\DateRange::wholeDays('fe.date', $form_from_date, $form_to_date);
+                        $depositedOn = \OpenEMR\Common\Dates\DateRange::wholeDays('s.deposit_date', $form_from_date, $form_to_date);
+                        $query .= "(" . $postedOn->sql . ") OR (" . $seenOn->sql . ") OR (" . $depositedOn->sql . ") )";
+                        array_push($sqlBindArray, ...$postedOn->binds, ...$seenOn->binds, ...$depositedOn->binds);
                         // If a procedure code was specified.
                         // Support code type if it is in the ar_activity table. Note it is not always included, so
                         // also support a blank code type in ar_activity table.

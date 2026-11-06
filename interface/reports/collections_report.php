@@ -729,13 +729,10 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_export']) || !empty($_
             $where .= " AND ";
         }
 
-        if ($form_to_date) {
-            $where .= "f.date >= ? AND f.date <= ? ";
-            array_push($sqlArray, $form_date . ' 00:00:00', $form_to_date . ' 23:59:59');
-        } else {
-            $where .= "f.date >= ? AND f.date <= ? ";
-            array_push($sqlArray, $form_date . ' 00:00:00', $form_date . ' 23:59:59');
-        }
+        // the whole days from the first through the last (one day when there is no last)
+        $onDays = \OpenEMR\Common\Dates\DateRange::wholeDays('f.date', $form_date, $form_to_date ?: $form_date);
+        $where .= $onDays->sql . " ";
+        array_push($sqlArray, ...$onDays->binds);
     }
 
     if ($form_facility) {

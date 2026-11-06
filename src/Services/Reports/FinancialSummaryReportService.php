@@ -18,6 +18,7 @@
 namespace OpenEMR\Services\Reports;
 
 use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Dates\DateRange;
 
 class FinancialSummaryReportService
 {
@@ -68,15 +69,14 @@ class FinancialSummaryReportService
                 ON c.code = b.code AND c.code_type = ct.ct_id
             SQL;
 
+        // the whole days from the first through the last
+        $onDays = DateRange::wholeDays('fe.date', $fromDate->format('Y-m-d'), $toDate->format('Y-m-d'));
         $conditions = [
             "b.code_type != 'COPAY'",
             'b.activity = 1',
-            'fe.date BETWEEN ? AND ?',
+            $onDays->sql,
         ];
-        $binds = [
-            $fromDate->format('Y-m-d 00:00:00'),
-            $toDate->format('Y-m-d 23:59:59'),
-        ];
+        $binds = $onDays->binds;
 
         if ($facilityId !== null) {
             $conditions[] = 'fe.facility_id = ?';
