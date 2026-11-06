@@ -278,9 +278,11 @@ class Claim
         // Twin (insurance-reference): the policies in force on the encounter date come from the
         // coverage service (its rule differs from this loop's old SQL on a zero end date, two
         // undated rows at one level, and a company that isn't a whole number).
-        $inForce = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
+        // A date of service it can't read gives no policies (CoverageDay has no day for it).
+        $visitDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($encounter_date);
+        $inForce = $visitDay === null ? [] : (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
             is_numeric($this->pid) ? (int)$this->pid : 0,
-            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($encounter_date)
+            $visitDay
         );
         foreach ($inForce as $effective) {
             $drow = $effective->columns;

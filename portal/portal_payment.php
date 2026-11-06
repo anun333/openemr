@@ -1025,9 +1025,11 @@ if ($alertmsg === '' && (($_POST['form_save'] ?? null) || filter_input(INPUT_GET
                 // Twin (insurance-reference): rule 10. With no insurance level in force on the visit date the balance is
                 // the patient's (master: only with none ever on file). The rest of master's test is kept: the number of
                 // levels on file compared with the last level closed.
-                $levelsInForce = count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
+                // A visit date it can't read counts no level in force (CoverageDay has no day for it).
+                $visitDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($dispdate);
+                $levelsInForce = $visitDay === null ? 0 : count((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(
                     is_numeric($pid) ? (int)$pid : 0,
-                    (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($dispdate)
+                    $visitDay
                 ));
                 $duept = 0;
                 if ((($levelsInForce == 0 || $value['last_level_closed'] == 4 || $NumberOfInsurance == $value['last_level_closed']))) { // Patient balance

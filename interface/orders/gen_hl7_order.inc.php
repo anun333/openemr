@@ -205,7 +205,7 @@ function default_gen_hl7_order(int $orderid): Hl7OrderResult
     $payers = default_loadPayerInfo($porow['pid'], (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
         $porow['date_collected'] ?? null,
         $porow['date_ordered'] ?? null
-    )->format('Y-m-d'));
+    )?->format('Y-m-d') ?? '');  // neither date readable: no day, and the wrapper gives no payers
     $setid = 0;
     foreach ($payers as $payer) {
         $payer_object = $payer['object'];

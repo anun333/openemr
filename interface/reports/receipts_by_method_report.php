@@ -659,10 +659,12 @@ if (!empty($_POST['form_refresh'])) {
                     $payerLevel = [1 => \OpenEMR\Services\Insurance\InsuranceLevel::Primary, 2 => \OpenEMR\Services\Insurance\InsuranceLevel::Secondary,
                         3 => \OpenEMR\Services\Insurance\InsuranceLevel::Tertiary][is_numeric($row['payer_type']) ? (int)$row['payer_type'] : 0] ?? null;
                     if ($payerLevel !== null) {
-                        $insurance_id = ['provider' => (new InsuranceService())->getEffectiveInsuranceAt(
+                        // A date of service it can't read names no payer (CoverageDay has no day for it).
+                        $serviceDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($row['date']);
+                        $insurance_id = ['provider' => $serviceDay === null ? null : (new InsuranceService())->getEffectiveInsuranceAt(
                             is_numeric($row['pid']) ? (int)$row['pid'] : 0,
                             $payerLevel,
-                            (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($row['date'])
+                            $serviceDay
                         )?->companyId];
                     } elseif ($row['payer_type'] == '0') {
                         $rowmethod = xl('Personal pay');

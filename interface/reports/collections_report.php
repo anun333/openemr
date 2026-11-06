@@ -966,9 +966,11 @@ if (!empty($_POST['form_refresh']) || !empty($_POST['form_export']) || !empty($_
         // Twin (insurance-reference): the insurance_data row of the policy at a level in force on the date of
         // service (the coverage service), or [] when none is; master read the latest-starting row, ended or not.
         $collectionsPolicyOn = static function (mixed $patientId, string $type, mixed $day): array {
-            $rows = (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
+            // A date of service it can't read gives no policy (CoverageDay has no day for it).
+            $serviceDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($day);
+            $rows = $serviceDay === null ? [] : (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(
                 is_numeric($patientId) ? (int)$patientId : 0,
-                (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($day)
+                $serviceDay
             );
             foreach ($rows as $row) {
                 if ($row->policy->level->value === $type) {
