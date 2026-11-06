@@ -116,6 +116,8 @@ $ounbilled = $unbilled;
 $oauthorized = $my_authorized;
 $x = new X12Partner();
 $partners = $x->_utility_array($x->x12_partner_factory());
+// Twin (insurance-reference): one coverage service for the page; its constructor backfills uuids.
+$coverageService = new \OpenEMR\Services\InsuranceService();
 ?>
 <!DOCTYPE html>
 <html>
@@ -1148,15 +1150,21 @@ $partners = $x->_utility_array($x->x12_partner_factory());
                                     $lhtml .= "<select name='claims[" . attr($this_encounter_id) . "][payer]' onchange='onNewPayer(event)' class='form-control'>";
 
                                     $last_level_closed = sqlQuery("SELECT `last_level_closed` FROM `form_encounter` WHERE `encounter` = ?", [$iter['enc_encounter']])['last_level_closed'];
-                                    $effective_insurances = getEffectiveInsurances($iter['pid'], $iter['enc_date']);
-                                    $insuranceCount = count($effective_insurances ?? []);
+                                    // Twin (insurance-reference): every level in force on the visit date, each with its level, so a
+                                    // current secondary behind an ended primary is offered, and the level after the last one closed
+                                    // is preselected by its number, not its place in the list.
+                                    $visitPid = $iter['pid'];
+                                    $visitDay = \OpenEMR\Services\Insurance\CoverageDay::fromStored($iter['enc_date']);
+                                    $effective_insurances = $visitDay === null ? [] : $coverageService->getEffectiveInsuranceRows(is_numeric($visitPid) ? (int)$visitPid : 0, $visitDay);
+                                    $insuranceCount = count($effective_insurances);
 
-                                    foreach ($effective_insurances as $key => $row) {
+                                    foreach ($effective_insurances as $effective) {
+                                        $row = $effective->columns;
                                         $insuranceName = sqlQuery("SELECT `name` FROM `insurance_companies` WHERE `id` = ?", [$row['provider']])['name'];
                                         $x12Partner = sqlQuery("SELECT `x12_default_partner_id` FROM `insurance_companies` WHERE `id` = ?", [$row['provider']])['x12_default_partner_id'];
                                         $lhtml .= "<option value=\"" . attr(substr((string) $row['type'], 0, 1) . $row['provider']) . "\"";
                                         if (
-                                            $key == $last_level_closed
+                                            $effective->policy->level->number() == (is_numeric($last_level_closed) ? (int)$last_level_closed : 0) + 1
                                             || $insuranceCount == 1
                                         ) {
                                             $lhtml .= " selected";

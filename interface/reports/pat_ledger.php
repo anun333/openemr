@@ -144,6 +144,11 @@ function PrintEncFooter(): void
     echo "<td class='detail text-right'>" . text(oeFormatMoney($enc_bal)) . "</td>";
     echo "</tr>\n";
 }
+/**
+ * Prints one visit's payment and adjustment rows (or, with $unassigned, the unapplied payments) and adds
+ * them to the running totals. Twin (insurance-reference): an insurer payment is named by the policy at its
+ * level among $effectiveInsurances, InsuranceService::getEffectiveInsuranceRows() for the visit date.
+ */
 function PrintCreditDetail($detail, $pat, $unassigned = false, $effectiveInsurances = []): void
 {
     global $enc_pmt, $total_pmt, $enc_adj, $total_adj, $enc_bal, $total_bal;
@@ -202,7 +207,15 @@ function PrintCreditDetail($detail, $pat, $unassigned = false, $effectiveInsuran
         if (empty($pmt['payer_type'])) {
             $payer = xl('Patient');
         } else {
-            $payerId = $effectiveInsurances[$pmt['payer_type'] - 1]['provider'];
+            // Twin (insurance-reference): the policy at the payment's level, by its number, not its
+            // place in the list, so a payment at level 2 is the secondary's even behind an ended primary.
+            $payerId = null;
+            $paymentLevel = $pmt['payer_type'];
+            foreach (is_array($effectiveInsurances) ? $effectiveInsurances : [] as $effective) {
+                if ($effective instanceof \OpenEMR\Services\Insurance\EffectiveInsuranceRow && $effective->policy->level->number() == $paymentLevel) {
+                    $payerId = $effective->policy->companyId;
+                }
+            }
             $payer = sqlQuery("SELECT `name` FROM `insurance_companies` WHERE `id` = ?", [$payerId])['name'];
         }
         $pmt_date = $unassigned ? substr((string) $pmt['post_to_date'], 0, 10) : substr((string) $pmt['post_time'], 0, 10);
@@ -729,8 +742,13 @@ if ($_REQUEST['form_refresh'] || $_REQUEST['form_csvexport']) {
     $hdr_printed = false;
     $prev_row = [];
     $effectiveInsurances = [];
+    // Twin (insurance-reference): one coverage service for the report; its constructor backfills uuids.
+    $coverageService = new \OpenEMR\Services\InsuranceService();
     while ($erow = sqlFetchArray($res)) {
-        $effectiveInsurances = getEffectiveInsurances(\OpenEMR\Common\Session\SessionWrapperFactory::getInstance()->getActiveSession()->get('pid'), $erow['date']);
+        // Twin (insurance-reference): the policies in force on the visit date, each with its level.
+        $ledgerPid = \OpenEMR\Common\Session\SessionWrapperFactory::getInstance()->getActiveSession()->get('pid');
+        $ledgerDay = \OpenEMR\Services\Insurance\CoverageDay::fromStored($erow['date']);
+        $effectiveInsurances = $ledgerDay === null ? [] : $coverageService->getEffectiveInsuranceRows(is_numeric($ledgerPid) ? (int)$ledgerPid : 0, $ledgerDay);
         $print = '';
         $csv = '';
         if ($erow['encounter'] != $prev_encounter_id) {
