@@ -211,7 +211,7 @@ function quest_gen_hl7_order(int $orderid): Hl7OrderResult
     $payers = quest_loadPayerInfo($porow['pid'], (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forLabOrder(
         $porow['date_collected'] ?? null,
         $porow['date_ordered'] ?? null
-    )->format('Y-m-d'));
+    )?->format('Y-m-d') ?? '');  // neither date readable: no day, and the wrapper gives no payers
     $setid = 0;
     if ($ins_type == 'T') {
         // only send primary and secondary insurance

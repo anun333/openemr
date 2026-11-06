@@ -96,7 +96,8 @@ function labcorp_loadPayerInfo($pid, $date = ''): array
     // secondary (IN1-22, the requisition's secondary fields).
     $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit($date);
     $payers = [];
-    foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
+    // A day it can't read gives no payers (CoverageDay has no day for it).
+    foreach ($day === null ? [] : (new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
         $drow = $effective->columns;
         $ins = $effective->policy->level->number() - 1;
         $crow = sqlQuery(
@@ -341,7 +342,7 @@ function labcorp_gen_hl7_order(int $orderid): Hl7OrderResult
     $labDay = (new CoverageDay(ServiceContainer::getClock()))->forLabOrder(
         $porow['date_collected'] ?? null,
         $porow['date_ordered'] ?? null
-    )->format('Y-m-d');
+    )?->format('Y-m-d') ?? '';  // neither date readable: no day, and no payers
     $payers = labcorp_loadPayerInfo($porow['pid'], $labDay);
     $setid = 0;
     if ($bill_type == 'T') {

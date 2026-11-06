@@ -409,7 +409,8 @@ STYLES;
             $procedure['date_collected'] ?? null,
             $procedure['date_ordered'] ?? null
         );
-        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $labDay) as $effective) {
+        // Neither date readable: no bill-to policy (CoverageDay has no day for it).
+        foreach ($labDay === null ? [] : (new \OpenEMR\Services\InsuranceService())->getEffectiveInsuranceRows(is_numeric($pid) ? (int)$pid : 0, $labDay) as $effective) {
             $policyRow = $effective->columns;
             if ($effective->policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary) {
                 $company = sqlQuery("SELECT name, id FROM insurance_companies WHERE id = ?", [$policyRow['provider']]);

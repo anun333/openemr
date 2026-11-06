@@ -128,7 +128,8 @@ class FeeSheet
         // date (master: getInsuranceData(), the latest-starting primary, ended or not).
         $this->payer_id = null;
         $visitDay = (new \OpenEMR\Services\Insurance\CoverageDay(\OpenEMR\BC\ServiceContainer::getClock()))->forVisit($this->visit_date);
-        foreach ((new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(is_numeric($this->pid) ? (int)$this->pid : 0, $visitDay) as $policy) {
+        // A visit date it can't read gives no payer (CoverageDay has no day for it).
+        foreach ($visitDay === null ? [] : (new \OpenEMR\Services\InsuranceService())->getEffectiveInsurances(is_numeric($this->pid) ? (int)$this->pid : 0, $visitDay) as $policy) {
             if ($policy->level === \OpenEMR\Services\Insurance\InsuranceLevel::Primary) {
                 $this->payer_id = $policy->companyId;
             }

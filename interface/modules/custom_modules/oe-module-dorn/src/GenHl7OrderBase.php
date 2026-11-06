@@ -233,7 +233,8 @@ class GenHl7OrderBase
         // on the day; master ignored the end date.
         $day = (new CoverageDay(ServiceContainer::getClock()))->forVisit($date);
         $payers = [];
-        foreach ((new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
+        // A day it can't read gives no payers (CoverageDay has no day for it).
+        foreach ($day === null ? [] : (new InsuranceService())->getEffectiveInsuranceRows((int)$pid, $day) as $effective) {
             $drow = $effective->columns;
             $ins = count($payers);
             $crow = sqlQuery("SELECT * FROM insurance_companies WHERE id = ?", [$drow['provider']]);
